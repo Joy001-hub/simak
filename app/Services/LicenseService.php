@@ -20,7 +20,8 @@ class LicenseService
 
     public function __construct()
     {
-        $this->licenseDir = storage_path('app/license');
+        // Use base_path to store license in application directory, not in AppData
+        $this->licenseDir = base_path('storage/app/license');
         $this->licenseFile = $this->licenseDir . '/license.dat';
         $this->jsonLicenseFile = $this->licenseDir . '/license.json';
     }

@@ -242,7 +242,7 @@
     </div>
 
     {{-- Floating Help Button --}}
-    <a href="https://member.juragankavling.web.id/member-area/support/" target="_blank"
+    <a href="https://kavling.pro/member-area/support/" target="_blank"
         class="float-help bg-[#b91c3b] text-white p-4 rounded-full shadow-lg hover:shadow-xl" title="Butuh bantuan?">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

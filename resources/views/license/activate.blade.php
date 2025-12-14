@@ -228,8 +228,8 @@
                     </button>
 
                     <p class="text-center text-sm text-slate-500 mt-6">
-                        Belum punya lisensi? <a href="https://member.juragankavling.web.id/member-area/license/"
-                            target="_blank" class="text-[#b91c3b] font-semibold hover:underline">Ambil lisensi di
+                        Belum punya lisensi? <a href="https://kavling.pro/member-area/license/" target="_blank"
+                            class="text-[#b91c3b] font-semibold hover:underline">Ambil lisensi di
                             sini</a>
                     </p>
                 </form>
@@ -238,7 +238,7 @@
     </div>
 
     {{-- Floating Help Button --}}
-    <a href="https://member.juragankavling.web.id/member-area/support/" target="_blank"
+    <a href="https://kavling.pro/member-area/support/" target="_blank"
         class="float-help bg-[#b91c3b] text-white p-4 rounded-full shadow-lg hover:shadow-xl" title="Butuh bantuan?">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

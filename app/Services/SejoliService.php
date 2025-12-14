@@ -20,7 +20,7 @@ use Illuminate\Http\Client\PendingRequest;
  */
 class SejoliService
 {
-    protected string $baseUrl = 'https://member.juragankavling.web.id';
+    protected string $baseUrl = 'https://kavling.pro';
 
     public function __construct()
     {
@@ -49,6 +49,7 @@ class SejoliService
 
     /**
      * Get hardware ID for this device
+     * Stores device ID in storage/app/device_id.txt
      */
     public function getHardwareID(): string
     {
@@ -57,16 +58,24 @@ class SejoliService
             return $biosUUID;
         }
 
-        $path = 'device_id.txt';
-        if (Storage::disk('local')->exists($path)) {
-            $saved = trim(Storage::disk('local')->get($path));
+        // Use consistent path with LicenseService
+        $path = storage_path('app/device_id.txt');
+        if (file_exists($path)) {
+            $saved = trim(file_get_contents($path));
             if (!empty($saved)) {
                 return $saved;
             }
         }
 
         $newId = (string) Str::uuid();
-        Storage::disk('local')->put($path, $newId);
+
+        // Ensure directory exists
+        $dir = dirname($path);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        file_put_contents($path, $newId);
         return $newId;
     }
 

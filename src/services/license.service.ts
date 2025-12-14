@@ -9,7 +9,7 @@ import {
 
 // Configuration - Sejoli License Server
 const LICENSE_CONFIG = {
-    BASE_URL: 'https://member.juragankavling.web.id', // Sejoli license server
+    BASE_URL: 'https://kavling.pro', // Sejoli license server
     ENDPOINTS: {
         ACTIVATE: '/sejoli-license/',
         VALIDATE: '/sejoli-validate-license/',
