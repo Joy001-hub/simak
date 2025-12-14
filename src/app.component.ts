@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, computed, inject, signal, OnInit, O
 import { CommonModule } from '@angular/common';
 import { DataService } from './services/data.service';
 import { ThemeService } from './services/theme.service';
+import { LicenseService } from './services/license.service';
 
 import { SidebarComponent } from './components/sidebar/sidebar.component';
 import { DashboardComponent } from './components/dashboard/dashboard.component';
@@ -12,6 +13,7 @@ import { LotsComponent } from './components/lots/lots.component';
 import { CustomersComponent } from './components/customers/customers.component';
 import { SalesmenComponent } from './components/salesmen/salesmen.component';
 import { DataManagementComponent } from './components/data-management/data-management.component';
+import { LicenseGateComponent } from './components/license-gate/license-gate.component';
 
 
 @Component({
@@ -28,6 +30,7 @@ import { DataManagementComponent } from './components/data-management/data-manag
     CustomersComponent,
     SalesmenComponent,
     DataManagementComponent,
+    LicenseGateComponent,
   ],
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -38,11 +41,12 @@ import { DataManagementComponent } from './components/data-management/data-manag
 export class AppComponent implements OnInit, OnDestroy {
   dataService = inject(DataService);
   themeService = inject(ThemeService);
+  licenseService = inject(LicenseService);
   isDarkMode = this.themeService.isDarkMode;
-  
+
   @ViewChild('mainContent') mainContent!: ElementRef<HTMLElement>;
   @ViewChild(SalesComponent) salesComponent?: SalesComponent;
-  
+
   activeView = signal('dashboard'); // dashboard, sales, projects, lots, customers, salesmen, company-profile, data-management
   showDisclaimer = signal(false);
   isSidebarOpen = signal(false);
@@ -56,7 +60,7 @@ export class AppComponent implements OnInit, OnDestroy {
   constructor() {
     effect(() => {
       const requestedView = this.dataService.requestedView();
-      if(requestedView) {
+      if (requestedView) {
         this.activeView.set(requestedView);
         this.dataService.requestedView.set(null); // Reset after handling
       }
@@ -115,9 +119,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
   onViewChange(view: string) {
     if (view === 'sales') {
-        this.salesComponent?.showSalesList();
+      this.salesComponent?.showSalesList();
     }
-    
+
     this.activeView.set(view);
     this.closeSidebar();
 
@@ -134,7 +138,7 @@ export class AppComponent implements OnInit, OnDestroy {
   closeSidebar() {
     this.isSidebarOpen.set(false);
   }
-  
+
   toggleTheme() {
     this.themeService.toggleTheme();
   }

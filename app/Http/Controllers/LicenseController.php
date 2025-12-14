@@ -1,11 +1,17 @@
 <?php
+
 namespace App\Http\Controllers;
+
 use Illuminate\Http\Request;
 use App\Services\LicenseService;
 use App\Services\SejoliService;
 use Illuminate\Support\Facades\Log;
+
 class LicenseController extends Controller
 {
+    /**
+     * Show activation form
+     */
     public function showActivate(LicenseService $licenseService)
     {
         $validation = $licenseService->validateLicense();
@@ -14,94 +20,235 @@ class LicenseController extends Controller
         }
         return view('license.activate');
     }
+
+    /**
+     * Show login form
+     */
     public function showLogin(LicenseService $licenseService)
     {
         return view('license.login', ['hardwareId' => $licenseService->getHardwareId()]);
     }
+
+    /**
+     * Process license activation
+     */
     public function processActivate(Request $request, LicenseService $licenseService)
     {
         Log::info('[License] processActivate hit', ['email' => $request->input('email')]);
-        $request->validate(['email' => 'required|email', 'password' => 'required|string', 'license' => 'required|string',]);
+
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
+            'license' => 'required|string',
+        ]);
+
         $email = trim($request->email);
         $password = $request->password;
         $licenseKey = trim($request->license);
+
         $result = $licenseService->activate($email, $password, $licenseKey);
+
+        // License already registered - redirect to activation with message
         if ($licenseService->messageContains($result, 'already registered')) {
-            return back()->withErrors(['msg' => 'Lisensi sudah terdaftar, silakan login atau reset.'])->withInput();
+            return redirect()->route('license.activate.form')
+                ->withErrors(['msg' => 'Lisensi sudah terdaftar di device lain. Silakan reset terlebih dahulu.'])
+                ->withInput();
         }
+
         $isValid = $licenseService->isRemoteValid($result, $licenseKey, 'activate');
+
         if ($isValid) {
-            $licenseService->saveLocalLicense(['license_key' => $licenseKey, 'status' => 'active', 'hardware_id' => $licenseService->getHardwareId(), 'email' => $email, 'last_check_at' => now()->toIso8601String(), 'message' => 'Registered via activation',]);
+            $licenseService->saveLocalLicense([
+                'license_key' => $licenseKey,
+                'status' => 'active',
+                'hardware_id' => $licenseService->getHardwareId(),
+                'email' => $email,
+                'last_check_at' => now()->toIso8601String(),
+                'message' => 'Registered via activation',
+            ]);
+
+            // Set session for authenticated access
+            session(['license_authenticated' => true]);
+            session(['license_user_email' => $email]);
+
             return redirect()->route('dashboard');
         }
-        Log::warning('[License] activation failed', ['email' => $email, 'license' => $licenseKey, 'response' => $result]);
-        return back()->withErrors(['msg' => 'Lisensi tidak valid atau kredensial salah.']);
+
+        Log::warning('[License] activation failed', [
+            'email' => $email,
+            'license' => $licenseKey,
+            'response' => $result
+        ]);
+
+        // Failed - stay on activation page with error
+        return redirect()->route('license.activate.form')
+            ->withErrors(['msg' => $result['message'] ?? 'Lisensi tidak valid atau kredensial salah.'])
+            ->withInput();
     }
+
+    /**
+     * Process login with license key only
+     */
     public function processLogin(Request $request, LicenseService $licenseService)
     {
         Log::info('[License] processLogin hit', ['license' => $request->input('license')]);
-        $request->validate(['license' => 'required|string',]);
+
+        $request->validate(['license' => 'required|string']);
+
         $licenseKey = trim($request->license);
         $local = $licenseService->loadLocalLicense();
+
         if (!$local || empty($local['license_key'])) {
-            return redirect()->route('license.activate.form')->withErrors(['msg' => 'Lisensi belum terdaftar. Silakan aktivasi terlebih dahulu.']);
+            return redirect()->route('license.activate.form')
+                ->withErrors(['msg' => 'Lisensi belum terdaftar. Silakan aktivasi terlebih dahulu.']);
         }
+
         $result = $licenseService->validateRemote($licenseKey);
         Log::info('[License] validateLicense response', ['license' => $licenseKey, 'response' => $result]);
+
         $isValid = $licenseService->isRemoteValid($result, $licenseKey, 'validate');
+
         if ($isValid) {
-            $licenseService->saveLocalLicense(['license_key' => $licenseKey, 'status' => 'active', 'hardware_id' => $licenseService->getHardwareId(), 'last_check_at' => now()->toIso8601String(), 'message' => 'Validated via login',]);
-            Log::info('[License] login successful, saved license.json', ['license' => $licenseKey]);
+            $licenseService->saveLocalLicense([
+                'license_key' => $licenseKey,
+                'status' => 'active',
+                'hardware_id' => $licenseService->getHardwareId(),
+                'last_check_at' => now()->toIso8601String(),
+                'message' => 'Validated via login',
+            ]);
+            Log::info('[License] login successful', ['license' => $licenseKey]);
             return redirect()->route('dashboard');
         }
+
         Log::warning('[License] login failed - invalid license', ['license' => $licenseKey]);
-        return back()->withErrors(['msg' => 'License key tidak valid.']);
+
+        // Invalid license - redirect to activation
+        return redirect()->route('license.activate.form')
+            ->withErrors(['msg' => 'License key tidak valid. Silakan aktivasi ulang.']);
     }
+
+    /**
+     * Process auth login with email/password
+     * 
+     * SECURITY: Must verify credentials with server to prevent unauthorized access
+     */
     public function processAuthLogin(Request $request, LicenseService $licenseService)
     {
         Log::info('[License] processAuthLogin hit', ['email' => $request->input('email')]);
-        $request->validate(['email' => 'required|email', 'password' => 'required|string',]);
+
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
+        ]);
+
         $email = trim($request->email);
         $password = $request->password;
         $local = $licenseService->loadLocalLicense();
         $licenseKey = $local['license_key'] ?? null;
+
         if (!$licenseKey) {
-            return back()->withErrors(['msg' => 'Lisensi belum terdaftar. Silakan aktivasi terlebih dahulu.'])->withInput();
+            // No license found - redirect to activation
+            return redirect()->route('license.activate.form')
+                ->withErrors(['msg' => 'Lisensi belum terdaftar. Silakan aktivasi terlebih dahulu.']);
         }
+
+        // SECURITY FIX: Send credentials to server for verification
+        // Server will check if email/password matches the license owner
         $sejoli = app(SejoliService::class);
-        $result = $sejoli->validateLicense($licenseKey);
-        Log::info('[License] authLogin validateLicense response', ['license' => $licenseKey, 'response' => $result]);
+        $result = $sejoli->validateLicenseWithAuth($email, $password, $licenseKey);
+
+        Log::info('[License] authLogin validateLicense response', [
+            'license' => $licenseKey,
+            'email' => $email,
+            'response' => $result
+        ]);
+
+        // Check for auth errors from server
+        if ($result && isset($result['valid']) && $result['valid'] === false) {
+            $message = $result['message'] ?? 'Email atau password salah.';
+            return redirect()->route('license.activate.form')
+                ->withErrors(['msg' => $message]);
+        }
+
         $isValid = $licenseService->isRemoteValid($result, $licenseKey, 'validate');
+
         if ($isValid) {
-            $licenseService->saveLocalLicense(['license_key' => $licenseKey, 'status' => 'active', 'hardware_id' => $licenseService->getHardwareId(), 'email' => $email, 'last_check_at' => now()->toIso8601String(), 'message' => 'Validated via auth login',]);
+            $remember = $request->boolean('remember');
+
+            $licenseService->saveLocalLicense([
+                'license_key' => $licenseKey,
+                'status' => 'active',
+                'hardware_id' => $licenseService->getHardwareId(),
+                'email' => $email,
+                'last_check_at' => now()->toIso8601String(),
+                'message' => 'Validated via auth login',
+                'remember_session' => $remember,
+            ]);
+
+            // Set session for authenticated access
+            session(['license_authenticated' => true]);
+            session(['license_user_email' => $email]);
+
+            // If remember is checked, set persistent session flag
+            if ($remember) {
+                session(['remember_session' => true]);
+                session(['persist_license' => true]);
+            }
+
             return redirect()->route('dashboard');
         }
-        return back()->withErrors(['msg' => 'Login gagal. Kredensial tidak valid atau lisensi tidak ditemukan.'])->withInput();
+
+        // Invalid credentials or license - redirect to activation
+        return redirect()->route('license.activate.form')
+            ->withErrors(['msg' => $result['message'] ?? 'Login gagal. Kredensial tidak valid atau lisensi tidak ditemukan.']);
     }
+
+    /**
+     * Process auth reset
+     */
     public function processAuthReset(Request $request, LicenseService $licenseService)
     {
         Log::info('[License] processAuthReset hit', ['email' => $request->input('email')]);
-        $request->validate(['email' => 'required|email', 'password' => 'required|string',]);
+
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
+        ]);
+
         $email = trim($request->email);
         $password = $request->password;
         $local = $licenseService->loadLocalLicense();
         $licenseKey = $local['license_key'] ?? null;
+
         if (!$licenseKey) {
-            return back()->withErrors(['msg' => 'Tidak ada lisensi yang tersimpan untuk direset.'])->withInput();
+            return redirect()->route('license.activate.form')
+                ->withErrors(['msg' => 'Tidak ada lisensi yang tersimpan untuk direset.']);
         }
+
         $sejoli = app(SejoliService::class);
         $result = $sejoli->resetLicense($email, $password, $licenseKey);
         Log::info('[License] authReset response', ['license' => $licenseKey, 'response' => $result]);
+
         if ($licenseService->messageContains($result, ['tidak ditemukan', "doesn't exist"])) {
-            return back()->withErrors(['msg' => 'Lisensi tidak ditemukan.'])->withInput();
+            return redirect()->route('license.activate.form')
+                ->withErrors(['msg' => 'Lisensi tidak ditemukan.']);
         }
+
         $success = $licenseService->isRemoteValid($result, $licenseKey, 'reset');
+
         if ($success) {
             $licenseService->revokeLocalLicense();
-            return redirect()->route('license.activate.form')->with('success', 'Lisensi berhasil direset. Silakan aktivasi ulang.');
+            return redirect()->route('license.activate.form')
+                ->with('success', 'Lisensi berhasil direset. Silakan aktivasi ulang.');
         }
-        return back()->withErrors(['msg' => 'Reset gagal. Kredensial tidak valid.'])->withInput();
+
+        return redirect()->route('license.activate.form')
+            ->withErrors(['msg' => 'Reset gagal. Kredensial tidak valid.']);
     }
+
+    /**
+     * Logout and revoke license
+     */
     public function logout()
     {
         app(LicenseService::class)->revokeLocalLicense();
@@ -109,54 +256,105 @@ class LicenseController extends Controller
         session()->regenerateToken();
         return redirect()->route('license.activate.form');
     }
+
+    /**
+     * Reset license
+     */
     public function reset(Request $request, LicenseService $licenseService)
     {
         Log::info('[License] reset called');
-        $request->validate(['email' => 'required|email', 'password' => 'required|string', 'license' => 'required|string',]);
+
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
+            'license' => 'required|string',
+        ]);
+
         $email = trim($request->email);
         $password = $request->password;
         $licenseKey = trim($request->license);
+
         $resp = $licenseService->resetRemote($email, $password, $licenseKey);
         Log::info('[License] reset response', ['license' => $licenseKey, 'response' => $resp]);
+
         if ($licenseService->messageContains($resp, ['tidak ditemukan', "doesn't exist"])) {
-            return back()->withErrors(['msg' => 'Lisensi tidak terdaftar.'])->withInput();
+            return redirect()->route('license.activate.form')
+                ->withErrors(['msg' => 'Lisensi tidak terdaftar.']);
         }
+
         $success = $licenseService->isRemoteValid($resp, $licenseKey, 'reset');
+
         if ($success) {
             $licenseService->revokeLocalLicense();
-            Log::info('[License] reset successful, license revoked');
-            return back()->with('success', 'Lisensi sudah direset. Silakan aktivasi ulang di perangkat lain.');
+            Log::info('[License] reset successful');
+            return redirect()->route('license.activate.form')
+                ->with('success', 'Lisensi sudah direset. Silakan aktivasi ulang di perangkat baru.');
         }
+
         Log::warning('[License] reset failed', ['response' => $resp]);
-        return back()->withErrors(['msg' => 'Reset lisensi gagal: ' . json_encode($resp)]);
+        return redirect()->route('license.activate.form')
+            ->withErrors(['msg' => 'Reset lisensi gagal: ' . ($resp['message'] ?? 'Unknown error')]);
     }
+
+    /**
+     * Revalidate existing license
+     */
     public function revalidate(LicenseService $licenseService)
     {
         $info = $licenseService->loadLocalLicense();
+
         if (!$info || empty($info['license_key'])) {
-            return redirect()->route('license.blocked')->withErrors(['msg' => 'Lisensi belum terdaftar atau hilang.']);
+            return redirect()->route('license.activate.form')
+                ->withErrors(['msg' => 'Lisensi belum terdaftar atau hilang.']);
         }
+
         $licenseKey = $info['license_key'];
         $hardwareId = $info['hardware_id'] ?? $info['string'] ?? null;
+
         if (!$hardwareId) {
             $hardwareId = $licenseService->getHardwareId();
         }
+
         $resp = $licenseService->validateRemote($licenseKey, $hardwareId);
         $valid = $licenseService->isRemoteValid($resp, $licenseKey, 'validate');
+
         if ($valid) {
-            $licenseService->saveLocalLicense(array_merge($info, ['license_key' => $licenseKey, 'status' => 'active', 'hardware_id' => $hardwareId, 'string' => $hardwareId, 'email' => $info['email'] ?? null, 'last_check_at' => now()->toIso8601String(), 'message' => 'Revalidate successful',]));
-            return redirect()->route('dashboard')->with('success', 'Lisensi tervalidasi ulang. Anda bisa lanjut menggunakan aplikasi.');
+            $licenseService->saveLocalLicense(array_merge($info, [
+                'license_key' => $licenseKey,
+                'status' => 'active',
+                'hardware_id' => $hardwareId,
+                'string' => $hardwareId,
+                'email' => $info['email'] ?? null,
+                'last_check_at' => now()->toIso8601String(),
+                'message' => 'Revalidate successful',
+            ]));
+            return redirect()->route('dashboard')
+                ->with('success', 'Lisensi tervalidasi ulang.');
         }
-        $licenseService->blockLocalLicense('Lisensi gagal divalidasi ulang.');
-        return redirect()->route('license.blocked')->withErrors(['msg' => 'Validasi gagal atau offline. Aktifkan internet lalu coba lagi.']);
-    }
-    public function blocked()
-    {
-        return view('license.blocked');
+
+        // Validation failed - redirect to activation
+        $licenseService->revokeLocalLicense();
+        return redirect()->route('license.activate.form')
+            ->withErrors(['msg' => 'Validasi gagal. Silakan aktivasi ulang.']);
     }
 
+    /**
+     * Show blocked page - redirects to activation
+     */
+    public function blocked()
+    {
+        // Redirect to activation instead of showing blocked page
+        return redirect()->route('license.activate.form')
+            ->withErrors(['msg' => 'Lisensi diblokir atau tidak valid. Silakan aktivasi ulang.']);
+    }
+
+    /**
+     * Show locked page - redirects to activation
+     */
     public function locked()
     {
-        return view('license.locked');
+        // Redirect to activation instead of showing locked page
+        return redirect()->route('license.activate.form')
+            ->withErrors(['msg' => 'Aplikasi terkunci. Silakan aktivasi ulang untuk melanjutkan.']);
     }
 }
