@@ -37,6 +37,9 @@ Route::post('/license/revalidate', [LicenseController::class, 'revalidate'])->na
 Route::get('/license/blocked', [LicenseController::class, 'blocked'])->name('license.blocked');
 Route::get('/license/locked', [LicenseController::class, 'locked'])->name('license.locked');
 Route::get('/logout', function () {
+    // Clear license authentication session
+    session()->forget('license_authenticated');
+    session()->forget('license_user_email');
     session()->invalidate();
     session()->regenerateToken();
     return redirect()->route('login');
