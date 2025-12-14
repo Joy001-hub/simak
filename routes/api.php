@@ -1,0 +1,2 @@
+<?php
+ use Illuminate\Http\Request; use Illuminate\Support\Facades\Route; use App\Http\Controllers\LicenseController; Route::prefix('license')->group(function () { Route::get('/status', [LicenseController::class, 'status'])->name('api.license.status'); }); Route::get('/health', function () { return response()->json([ 'status' => 'ok', 'timestamp' => now(), 'app_name' => config('app.name'), ]); }); 

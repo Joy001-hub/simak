@@ -1,0 +1,148 @@
+@extends('layouts.app')
+
+@section('content')
+    <div class="page-heading" style="align-items:center; margin-bottom:6px;">
+        <div>
+            <h1 class="heading-title">Profil Perusahaan</h1>
+
+        </div>
+    </div>
+
+
+
+    <form id="companyForm" action="{{ route('profile.update') }}" method="POST" enctype="multipart/form-data">
+        @csrf
+        <div class="card"
+            style="max-width: 1100px; width: 100%; margin: 0 auto; gap: 18px; padding:22px; box-shadow:0 18px 36px rgba(17,24,39,0.06); border:1px solid #e5e7eb;">
+            <h3 class="panel-title" style="padding:0 0 6px 0;">Informasi Dasar</h3>
+            <div class="grid-2" style="column-gap:18px; row-gap:12px;">
+                <div class="field">
+                    <label class="hint">Nama Perusahaan</label>
+                    <input class="input sm" type="text" name="name" value="{{ old('name', $company?->name) }}">
+                </div>
+                <div class="field">
+                    <label class="hint">NPWP</label>
+                    <input class="input sm" type="text" name="npwp" value="{{ old('npwp', $company?->npwp) }}">
+                </div>
+                <div class="field">
+                    <label class="hint">Email</label>
+                    <input class="input sm" type="email" name="email" value="{{ old('email', $company?->email) }}">
+                </div>
+                <div class="field">
+                    <label class="hint">Telepon</label>
+                    <input class="input sm" type="text" name="phone" value="{{ old('phone', $company?->phone) }}">
+                </div>
+            </div>
+            <div class="field">
+                <label class="hint">Alamat</label>
+                <textarea class="input sm" name="address" rows="2">{{ old('address', $company?->address) }}</textarea>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 4px 0 4px;">
+            <h3 class="panel-title" style="padding:0 0 6px 0;">Pengaturan Cetakan</h3>
+            <div class="upload-box"
+                style="justify-content:flex-start; gap:14px; align-items:center; padding:14px 16px; border:1px dashed #cbd5e1; border-radius:14px; background:#f8fafc;">
+
+                <input id="logoUpload" name="logo" type="file" accept="image/*">
+                <input type="file" name="logo" id="logoInput" class="d-none" accept="image/*"
+                    onchange="previewImage(event)">
+
+                <label for="logoInput" class="btn btn-light btn-sm mb-2" style="cursor: pointer;">
+                    Upload Logo
+                </label>
+
+                <div class="preview-box">
+                    @php
+                        // Logika server-side yang tadi (tetap dipakai untuk load awal)
+                        $logoPath = $company->logo_path ?? '';
+                        $filename = basename($logoPath);
+                        if ($logoPath) {
+                            $displayUrl = url('/native-img/logos/' . $filename) . '?v=' . time();
+                        } else {
+                            $displayUrl = asset('assets/img/upload-placeholder.png');
+                        }
+                    @endphp
+
+                    <img id="logoPreview" src="{{ $displayUrl }}" alt="Logo Preview"
+                        style="max-height: 150px; width: auto; object-fit: contain; border: 1px solid #eee; border-radius: 8px;"
+                        onerror="this.onerror=null;this.src='{{ asset('/logo-app.png') }}';">
+                </div>
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <span class="hint">Format: 512x512, PNG/JPG, maks 1 MB.</span>
+                    <span class="hint">Rekomendasi: background transparan.</span>
+                </div>
+            </div>
+
+            <div class="grid-2" style="column-gap:18px;">
+                <div class="field">
+                    <label class="hint">Nama Tanda Tangan Admin</label>
+                    <input class="input sm" type="text" name="signer_name"
+                        value="{{ old('signer_name', $company?->signer_name) }}">
+                </div>
+                <div class="field">
+                    <label class="hint">Catatan Kaki Cetakan</label>
+                    <input class="input sm" type="text" name="footer_note"
+                        value="{{ old('footer_note', $company?->footer_note) }}">
+                </div>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 4px 0 4px;">
+            <h3 class="panel-title" style="padding:0 0 6px 0;">Format Penomoran</h3>
+            <p class="hint" style="margin:0 0 10px 0;">Gunakan: {YYYY} = Tahun, {MM} = Bulan, {DD} = Hari, {####} = nomor
+                urut (4 digit).</p>
+            <div class="grid-2" style="column-gap:18px; row-gap:12px;">
+                <div class="field">
+                    <label class="hint">Format Faktur</label>
+                    <input class="input sm" type="text" name="invoice_format"
+                        value="{{ old('invoice_format', $company?->invoice_format) }}">
+                </div>
+                <div class="field">
+                    <label class="hint">Format Kwitansi</label>
+                    <input class="input sm" type="text" name="receipt_format"
+                        value="{{ old('receipt_format', $company?->receipt_format) }}">
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; margin-top:6px;">
+                <button class="btn primary" type="submit" form="companyForm" style="min-width:160px;">Simpan
+                    Perubahan</button>
+            </div>
+        </div>
+    </form>
+
+    @push('scripts')
+        <script>
+            const logoUpload = document.getElementById('logoUpload');
+            const logoPreview = document.getElementById('logoPreview');
+
+            logoUpload?.addEventListener('change', (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    if (logoPreview && e.target?.result) {
+                        logoPreview.src = `${e.target.result}`;
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+        </script>
+        <script>
+            function previewImage(event) {
+                var reader = new FileReader();
+                var imageField = document.getElementById("logoPreview");
+
+                reader.onload = function () {
+                    if (reader.readyState == 2) {
+                        // Ganti src gambar dengan hasil file yang baru dipilih
+                        imageField.src = reader.result;
+                    }
+                }
+
+                // Baca file yang dipilih user
+                if (event.target.files[0]) {
+                    reader.readAsDataURL(event.target.files[0]);
+                }
+            }
+        </script>
+    @endpush
+@endsection

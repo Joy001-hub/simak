@@ -1,0 +1,2 @@
+<?php
+ namespace App\Http\Requests; use Illuminate\Foundation\Http\FormRequest; class LotRequest extends FormRequest { public function authorize(): bool { return true; } public function rules(): array { return [ 'project_id' => ['required', 'exists:projects,id'], 'block_number' => ['required', 'string', 'max:50'], 'area' => ['nullable', 'integer', 'min:0'], 'base_price' => ['nullable', 'integer', 'min:0'], 'status' => ['required', 'in:available,sold,reserved,active'], ]; } } 
