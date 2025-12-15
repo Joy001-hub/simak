@@ -49,7 +49,10 @@
                         <td>{{ $lot->block_number }}</td>
                         <td>{{ $lot->area }}</td>
                         <td>Rp {{ number_format($lot->base_price, 0, ',', '.') }}</td>
-                        <td><span class="status-chip danger">{{ $lot->status }}</span></td>
+                        @php
+                            $statusClass = $lot->status === 'available' ? 'success' : 'danger';
+                        @endphp
+                        <td><span class="status-chip {{ $statusClass }}">{{ $lot->status }}</span></td>
                         <td style="padding-left:14px; white-space: nowrap;">
                             <a href="{{ route('kavling.edit', $lot) }}" class="btn" style="padding:8px 10px; border-color:#e5e7eb;">Edit</a>
                             <form action="{{ route('kavling.destroy', $lot) }}" method="POST" style="display:inline;">

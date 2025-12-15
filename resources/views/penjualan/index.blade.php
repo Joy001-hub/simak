@@ -75,7 +75,7 @@
                 <div class="field">
                     <label class="hint">Status Penjualan</label>
                     <select name="status_penjualan" class="input">
-                        @foreach (['Semua', 'Paid Off', 'Active', 'Canceled'] as $opt)
+                        @foreach (['Semua', 'Paid Off', 'Active', 'Batal (Refund)'] as $opt)
                             <option value="{{ $opt }}" @selected(($filters['status_penjualan'] ?? 'Semua') === $opt)>{{ $opt }}
                             </option>
                         @endforeach
