@@ -112,16 +112,18 @@
                                     <td>{{ optional($payment->due_date)->format('d M Y') }}</td>
                                     <td>Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
                                     <td>
-                                        <span class="status-chip {{ $payment->status === 'paid' ? 'success' : 'info' }}">
+                                        <span class="status-chip {{ $payment->status === 'paid' ? 'success' : ($payment->status === 'partial' ? 'warning' : 'info') }}" style="{{ $payment->status === 'partial' ? 'background:#fef3c7; color:#92400e;' : '' }}">
                                             {{ $payment->status }}
                                         </span>
                                     </td>
                                     <td style="text-align:right; white-space:nowrap;">
-                                        @if ($payment->status === 'unpaid')
+                                        @if ($payment->status !== 'paid')
                                             <form action="{{ route('payments.update', $payment) }}" method="POST" style="display:inline;">
                                                 @csrf
                                                 @method('PATCH')
-                                                <button type="submit" class="btn" style="padding:6px 10px; color:#b4232a; border:none; background:none; font-weight:700; text-decoration:none; cursor:pointer;">Bayar Lunas</button>
+                                                <button type="submit" class="btn" style="padding:6px 10px; color:#b4232a; border:none; background:none; font-weight:700; text-decoration:none; cursor:pointer;">
+                                                    {{ $payment->status === 'partial' ? 'Bayar Sisa' : 'Bayar Lunas' }}
+                                                </button>
                                             </form>
                                         @else
                                             <span style="font-size:12px; color:#64748b;">{{ optional($payment->paid_at)->format('d M Y') }}</span>
