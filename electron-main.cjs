@@ -166,6 +166,28 @@ function createMainWindow() {
         return { action: 'deny' };
     });
 
+    // Fix: Ensure proper focus handling for input fields
+    // This fixes the issue where input fields require alt+tab to be clickable
+    mainWindow.on('focus', () => {
+        mainWindow.webContents.focus();
+    });
+
+    // Ensure focus is properly set when window is shown
+    mainWindow.once('ready-to-show', () => {
+        mainWindow.focus();
+        mainWindow.webContents.focus();
+    });
+
+    // Handle blur/focus to ensure proper input field interaction
+    mainWindow.on('blur', () => {
+        // Window lost focus - this is normal
+    });
+
+    mainWindow.on('restore', () => {
+        // When window is restored from minimized state, ensure focus
+        mainWindow.webContents.focus();
+    });
+
     return mainWindow;
 }
 

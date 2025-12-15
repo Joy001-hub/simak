@@ -134,7 +134,9 @@
 
     <!-- Backdrop -->
     <div class="fixed inset-0 bg-gray-600 bg-opacity-75 transition-opacity ease-in-out duration-300 dark:bg-black/70"
-      [class.opacity-100]="isSidebarOpen()" [class.opacity-0]="!isSidebarOpen()" (click)="closeSidebar()"
+      [class.opacity-100]="isSidebarOpen()" [class.opacity-0]="!isSidebarOpen()" 
+      [class.pointer-events-auto]="isSidebarOpen()" [class.pointer-events-none]="!isSidebarOpen()"
+      (click)="closeSidebar()"
       aria-hidden="true"></div>
 
     <!-- Sidebar -->
