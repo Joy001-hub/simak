@@ -107,6 +107,13 @@
                         </thead>
                         <tbody>
                             @forelse ($sale->payments as $payment)
+                                @php
+                                    $note = $payment->note ?? '';
+                                    $isSchedule = $note === null || str_starts_with($note, 'Angsuran') || str_starts_with($note, 'Down Payment');
+                                @endphp
+                                @if (! $isSchedule)
+                                    @continue
+                                @endif
                                 <tr>
                                     <td>{{ $loop->iteration }}</td>
                                     <td>{{ optional($payment->due_date)->format('d M Y') }}</td>

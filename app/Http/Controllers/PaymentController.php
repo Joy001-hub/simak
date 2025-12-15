@@ -73,18 +73,15 @@ class PaymentController extends Controller
                 $allocatedTotal += $toAllocate;
             }
 
-            // Jika ada sisa yang tidak bisa dialokasikan (kelebihan)
-            if ($remainingAmount > 0) {
-                $overpayAmount = $remainingAmount;
-                Payment::create([
-                    'sale_id' => $sale->id,
-                    'due_date' => $paymentDate,
-                    'amount' => $overpayAmount,
-                    'status' => 'paid',
-                    'paid_at' => $paymentDate,
-                    'note' => 'Kelebihan Pembayaran',
-                ]);
-            }
+            // Catat satu entry pembayaran untuk riwayat (total yang dibayarkan user)
+            Payment::create([
+                'sale_id' => $sale->id,
+                'due_date' => $paymentDate,
+                'amount' => (int) $data['amount'],
+                'status' => 'paid',
+                'paid_at' => $paymentDate,
+                'note' => $paymentNote !== '' ? $paymentNote : 'Pembayaran Fleksibel',
+            ]);
 
             $this->recalculateSale($sale);
             DB::commit();
