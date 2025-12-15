@@ -17,15 +17,7 @@ Write-Host "1. Backing up current state (git)..." -ForegroundColor Cyan
 Write-Host "2. Stripping comments from PHP files..." -ForegroundColor Cyan
 php scripts/strip_comments.php
 
-# 3. Build
-Write-Host "3. Building NativePHP application..." -ForegroundColor Cyan
-try {
-    php artisan native:build win
-} catch {
-    Write-Host "Build failed! Restoring source code..." -ForegroundColor Red
-    git checkout .
-    exit 1
-}
+
 
 # 4. Restore
 Write-Host "4. Restoring source code to original state..." -ForegroundColor Cyan
