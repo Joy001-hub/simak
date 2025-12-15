@@ -1,2 +1,15 @@
 <?php
- namespace App\Providers; use Native\Laravel\Facades\Window; use Native\Laravel\Contracts\ProvidesPhpIni; class NativeAppServiceProvider implements ProvidesPhpIni { public function boot(): void { Window::open() ->title(config('app.name', 'Simak')) ->maximized() ->hideMenu() ->icon(public_path('icon.png')); } public function phpIni(): array { return [ ]; } } 
+namespace App\Providers;
+use Native\Laravel\Facades\Window;
+use Native\Laravel\Contracts\ProvidesPhpIni;
+class NativeAppServiceProvider implements ProvidesPhpIni
+{
+    public function boot(): void
+    {
+        Window::open()->title(config('app.name', 'Simak'))->maximized()->hideMenu()->focusable()->icon(public_path('icon.png'));
+    }
+    public function phpIni(): array
+    {
+        return [];
+    }
+}
