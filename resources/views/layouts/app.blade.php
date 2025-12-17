@@ -204,7 +204,6 @@
                 @php
                     $sale = $payment->sale;
                     $buyer = optional($sale)->buyer;
-                    $lot = optional($sale)->lot;
                     $lateDaysRaw = $payment->due_date ? \Carbon\Carbon::parse($payment->due_date)->diffInDays(\Carbon\Carbon::now()) : 0;
                     $lateDays = max(0, (int) $lateDaysRaw);
                     $totalMonths = intdiv($lateDays, 30);
@@ -227,12 +226,9 @@
                 <div class="bell-card">
                     <div class="bell-card-content">
                         <strong class="bell-card-name">{{ $buyer->name ?? 'Tidak diketahui' }}</strong>
-                        @if($lot)
-                            <small class="bell-card-lot">Blok {{ $lot->block_number ?? '-' }}</small>
-                        @endif
                         <div class="bell-card-info">
                             <div class="bell-info-row">
-                                <span class="bell-info-label">{{ $payment->note ?? 'Angsuran' }}</span>
+                                <span class="bell-info-label">Total</span>
                                 <br />
                                 <span class="bell-info-value">Tunggakan: Rp
                                     {{ number_format($payment->amount, 0, ',', '.') }}</span>
@@ -342,14 +338,6 @@
             color: #1f2937;
             font-size: 14px;
             font-weight: 700;
-            margin-bottom: 2px;
-        }
-
-        .bell-card-lot {
-            display: block;
-            color: #6b7280;
-            font-size: 11px;
-            font-weight: 500;
             margin-bottom: 8px;
         }
 

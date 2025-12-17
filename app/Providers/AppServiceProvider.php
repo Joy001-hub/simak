@@ -52,10 +52,9 @@ class AppServiceProvider extends ServiceProvider
                 $overdueCount = 0;
                 $overduePayments = collect();
                 if (Schema::hasTable('payments')) {
-                    // Sertakan tagihan yang jatuh tempo hari ini sebagai overdue agar masuk notifikasi
                     $overdueQuery = Payment::with(['sale.buyer', 'sale.lot'])
                         ->where('status', 'unpaid')
-                        ->whereDate('due_date', '<=', Carbon::today());
+                        ->whereDate('due_date', '<', Carbon::today());
                     $overdueCount = $overdueQuery->count();
                     $overduePayments = $overdueQuery->orderBy('due_date', 'asc')->limit(50)->get();
                 }
