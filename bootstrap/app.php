@@ -25,8 +25,17 @@ if ($isProductionBuild && getenv('APPDATA')) {
     }
 
     $dbPath = $nativeStorage . DIRECTORY_SEPARATOR . 'database.sqlite';
+    $sourceDb = __DIR__ . '/../database/database.sqlite';
+    
+    // Copy database with dummy data if user's database doesn't exist
     if (!file_exists($dbPath)) {
-        @touch($dbPath);
+        if (file_exists($sourceDb) && filesize($sourceDb) > 0) {
+            // Copy bundled database with dummy data
+            @copy($sourceDb, $dbPath);
+        } else {
+            // Fallback: create empty database
+            @touch($dbPath);
+        }
     }
 
     putenv("NATIVEPHP_STORAGE_PATH={$nativeStorage}");

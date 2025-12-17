@@ -32,6 +32,10 @@ class DataManagementController extends Controller
     {
         $path = storage_path('app/demo-seed.json');
         if (!file_exists($path)) {
+            // Fallback to public assets
+            $path = public_path('assets/data-dummy.json');
+        }
+        if (!file_exists($path)) {
             return redirect()->route('data.index')->with('error', 'File data dummy tidak ditemukan.');
         }
 
@@ -296,7 +300,8 @@ class DataManagementController extends Controller
 
         $lotMap = [];
         foreach ($data['lots'] ?? [] as $l) {
-            $blockNumber = trim(($l['block'] ?? '') . '-' . ($l['lot_number'] ?? ''));
+            // Support both formats: block_number OR block + lot_number
+            $blockNumber = $l['block_number'] ?? trim(($l['block'] ?? '') . '-' . ($l['lot_number'] ?? ''));
             $lot = Lot::create([
                 'project_id' => $projectMap[$l['project_id'] ?? null] ?? null,
                 'block_number' => $blockNumber ?: 'LOT',
@@ -307,8 +312,10 @@ class DataManagementController extends Controller
             $lotMap[$l['id'] ?? null] = $lot->id;
         }
 
+        // Support both formats: buyers OR customers
         $buyerMap = [];
-        foreach ($data['customers'] ?? [] as $b) {
+        $buyerData = $data['buyers'] ?? $data['customers'] ?? [];
+        foreach ($buyerData as $b) {
             $buyer = Buyer::create([
                 'name' => $b['name'] ?? 'Buyer',
                 'phone' => $b['phone'] ?? null,
@@ -318,8 +325,10 @@ class DataManagementController extends Controller
             $buyerMap[$b['id'] ?? null] = $buyer->id;
         }
 
+        // Support both formats: marketers OR salesmen
         $marketerMap = [];
-        foreach ($data['salesmen'] ?? [] as $m) {
+        $marketerData = $data['marketers'] ?? $data['salesmen'] ?? [];
+        foreach ($marketerData as $m) {
             $marketer = Marketer::create([
                 'name' => $m['name'] ?? 'Sales',
                 'phone' => $m['phone'] ?? null,
@@ -329,50 +338,79 @@ class DataManagementController extends Controller
 
         $saleMap = [];
         foreach ($data['sales'] ?? [] as $s) {
-            $price = $s['grand_total'] ?? $s['harga_netto'] ?? 0;
-            $dp = $s['dp_terbayar'] ?? $s['uang_muka_rp'] ?? 0;
-            $tenor = $s['tenor'] ?? 0;
+            // Support both formats for field names
+            $lotIdKey = $s['lot_id'] ?? $s['kavling_id'] ?? null;
+            $buyerIdKey = $s['buyer_id'] ?? $s['customer_id'] ?? null;
+            $marketerIdKey = $s['marketer_id'] ?? $s['sales_id'] ?? null;
+            
+            $lotId = $lotMap[$lotIdKey] ?? null;
+            $buyerId = $buyerMap[$buyerIdKey] ?? null;
+            $marketerId = $marketerMap[$marketerIdKey] ?? null;
+            
+            // Skip if lot_id is null (required field)
+            if (!$lotId) {
+                continue;
+            }
+            
+            $price = $s['price'] ?? $s['grand_total'] ?? $s['harga_netto'] ?? 0;
+            $dp = $s['down_payment'] ?? $s['dp_terbayar'] ?? $s['uang_muka_rp'] ?? 0;
+            $tenor = $s['tenor_months'] ?? $s['tenor'] ?? 0;
+            $bookingDate = $s['booking_date'] ?? $s['invoice_date'] ?? null;
+            $paymentMethod = $s['payment_method'] ?? ($tenor > 0 ? 'installment' : 'cash');
+            $dueDay = $s['due_day'] ?? $s['jatuh_tempo_hari'] ?? null;
+            $paidAmount = $s['paid_amount'] ?? 0;
+            $outstandingAmount = $s['outstanding_amount'] ?? $price;
+            $status = $s['status'] ?? 'active';
+            
             $sale = Sale::create([
-                'lot_id' => $lotMap[$s['kavling_id'] ?? null] ?? null,
-                'buyer_id' => $buyerMap[$s['customer_id'] ?? null] ?? null,
-                'marketer_id' => $marketerMap[$s['sales_id'] ?? null] ?? null,
-                'booking_date' => $s['invoice_date'] ?? null,
-                'payment_method' => $tenor > 0 ? 'installment' : 'cash',
+                'lot_id' => $lotId,
+                'buyer_id' => $buyerId,
+                'marketer_id' => $marketerId,
+                'booking_date' => $bookingDate,
+                'payment_method' => $paymentMethod,
                 'price' => $price,
                 'down_payment' => $dp,
                 'tenor_months' => $tenor,
-                'due_day' => $s['jatuh_tempo_hari'] ?? null,
-                'paid_amount' => 0,
-                'outstanding_amount' => $price,
-                'status' => 'active',
+                'due_day' => $dueDay,
+                'paid_amount' => $paidAmount,
+                'outstanding_amount' => $outstandingAmount,
+                'status' => $status,
             ]);
             $saleMap[$s['id'] ?? null] = $sale->id;
 
-            if ($dp > 0) {
+            // Only create down payment record if not already in payments data
+            if ($dp > 0 && empty($data['payments'])) {
                 Payment::create([
                     'sale_id' => $sale->id,
-                    'due_date' => $s['invoice_date'] ?? null,
+                    'due_date' => $bookingDate,
                     'amount' => $dp,
                     'status' => 'paid',
-                    'note' => 'Down Payment',
-                    'paid_at' => $s['invoice_date'] ?? null,
+                    'note' => 'Uang Muka',
+                    'paid_at' => $bookingDate,
                 ]);
             }
         }
 
-        foreach ($data['installments'] ?? [] as $ins) {
-            $saleId = $saleMap[$ins['sale_id'] ?? null] ?? null;
+        // Support both formats: payments OR installments
+        $paymentData = $data['payments'] ?? $data['installments'] ?? [];
+        foreach ($paymentData as $pmt) {
+            $saleId = $saleMap[$pmt['sale_id'] ?? null] ?? null;
             if (!$saleId) {
                 continue;
             }
 
+            $status = $pmt['status'] ?? 'unpaid';
+            if (!in_array($status, ['paid', 'unpaid', 'overdue'])) {
+                $status = $status === 'paid' ? 'paid' : 'unpaid';
+            }
+
             Payment::create([
                 'sale_id' => $saleId,
-                'due_date' => $ins['due_date'] ?? null,
-                'amount' => $ins['amount'] ?? 0,
-                'status' => ($ins['status'] ?? 'unpaid') === 'paid' ? 'paid' : 'unpaid',
-                'note' => 'Angsuran ke-' . ($ins['installment_number'] ?? '-'),
-                'paid_at' => $ins['payment_date'] ?? null,
+                'due_date' => $pmt['due_date'] ?? null,
+                'amount' => $pmt['amount'] ?? 0,
+                'status' => $status,
+                'note' => $pmt['note'] ?? (isset($pmt['installment_number']) ? 'Angsuran ke-' . $pmt['installment_number'] : null),
+                'paid_at' => $pmt['paid_at'] ?? $pmt['payment_date'] ?? null,
             ]);
         }
 
@@ -383,12 +421,15 @@ class DataManagementController extends Controller
             $project->save();
         }
 
-        foreach (Sale::all() as $sale) {
-            $paidSum = $sale->payments()->where('status', 'paid')->sum('amount');
-            $sale->paid_amount = min($sale->price, $paidSum);
-            $sale->outstanding_amount = max(0, $sale->price - $sale->paid_amount);
-            $sale->status = $sale->outstanding_amount <= 0 ? 'paid_off' : 'active';
-            $sale->save();
+        // Recalculate paid amounts if payments were included
+        if (!empty($data['payments'])) {
+            foreach (Sale::all() as $sale) {
+                $paidSum = $sale->payments()->where('status', 'paid')->sum('amount');
+                $sale->paid_amount = min($sale->price, $paidSum);
+                $sale->outstanding_amount = max(0, $sale->price - $sale->paid_amount);
+                $sale->status = $sale->outstanding_amount <= 0 ? 'paid_off' : 'active';
+                $sale->save();
+            }
         }
     }
 }
