@@ -30,30 +30,19 @@ class DataManagementController extends Controller
 
     public function loadDemo()
     {
-        $path = storage_path('app/demo-seed.json');
-        if (!file_exists($path)) {
-            // Fallback to public assets
-            $path = public_path('assets/data-dummy.json');
+        try {
+            DB::transaction(function () {
+                $this->resetData();
+                $this->generateDemoData();
+                $this->seedDefaultCompanyProfile();
+            });
+
+            $this->clearCaches();
+
+            return redirect()->route('data.index')->with('success', 'Data demo berhasil dibuat.');
+        } catch (\Throwable $e) {
+            return redirect()->route('data.index')->with('error', 'Gagal membuat data demo: ' . $e->getMessage());
         }
-        if (!file_exists($path)) {
-            return redirect()->route('data.index')->with('error', 'File data dummy tidak ditemukan.');
-        }
-
-        $json = file_get_contents($path);
-        $data = json_decode($json, true);
-        if (!$data || !is_array($data)) {
-            return redirect()->route('data.index')->with('error', 'File data dummy tidak valid.');
-        }
-
-        DB::transaction(function () use ($data) {
-            $this->resetData();
-            $this->importDemoData($data);
-            $this->seedDefaultCompanyProfile();
-        });
-
-        $this->clearCaches();
-
-        return redirect()->route('data.index')->with('success', 'Data dummy berhasil dimuat dari backup JSON.');
     }
 
     public function reset()
@@ -282,6 +271,220 @@ class DataManagementController extends Controller
             'receipt_format' => 'KW/{YYYY}/{MM}/{####}',
             'logo_path' => null,
         ]);
+    }
+
+    /**
+     * Generate demo data programmatically (no external JSON files).
+     */
+    private function generateDemoData(): void
+    {
+        $now = now()->toDateTimeString();
+        $today = now()->startOfDay();
+
+        // Projects
+        $projects = [
+            ['name' => 'Kavling Harmoni Alam', 'location' => 'Ciawi, Bogor', 'notes' => 'Pengembangan tahap 1 seluas 2 hektar.'],
+            ['name' => 'Kavling Mutiara Residence', 'location' => 'Sentul, Bogor', 'notes' => 'Kawasan premium dengan pemandangan pegunungan.'],
+            ['name' => 'Kavling Permata Hills', 'location' => 'Puncak, Bogor', 'notes' => 'Investasi properti premium di kawasan wisata.'],
+            ['name' => 'Kavling Surya Garden', 'location' => 'Jonggol, Bogor', 'notes' => 'Perumahan asri dengan konsep hijau.'],
+        ];
+
+        $projectMap = [];
+        foreach ($projects as $p) {
+            $project = Project::create($p + ['total_units' => 0, 'sold_units' => 0]);
+            $projectMap[] = $project->id;
+        }
+
+        // Lots
+        $blocks = ['A', 'B', 'C', 'D', 'E'];
+        $lotCounts = [40, 35, 25, 30];
+        $lotMap = [];
+
+        foreach ($projectMap as $idx => $projectId) {
+            $totalLots = $lotCounts[$idx] ?? 30;
+            $lotsPerBlock = (int) ceil($totalLots / count($blocks));
+            $count = 0;
+
+            foreach ($blocks as $block) {
+                for ($num = 1; $num <= $lotsPerBlock && $count < $totalLots; $num++) {
+                    $area = rand(80, 200);
+                    $lot = Lot::create([
+                        'project_id' => $projectId,
+                        'block_number' => "{$block}-{$num}",
+                        'area' => $area,
+                        'base_price' => $area * rand(1000000, 1500000),
+                        'status' => 'available',
+                    ]);
+                    $lotMap[] = $lot->id;
+                    $count++;
+                }
+            }
+        }
+
+        // Marketers
+        $marketerNames = ['Andi Firmansyah', 'Bima Sakti', 'Citra Dewi', 'Denny Pratama', 'Eka Putra', 'Fauzi Rahman'];
+        $marketerMap = [];
+        foreach ($marketerNames as $i => $name) {
+            $marketer = Marketer::create(['name' => $name, 'phone' => '08123456700' . ($i + 1)]);
+            $marketerMap[] = $marketer->id;
+        }
+
+        // Buyers
+        $firstNames = ['Ahmad', 'Budi', 'Cahya', 'Dewi', 'Eka', 'Fitri', 'Galih', 'Hana', 'Irfan', 'Joko', 'Kartika', 'Lina', 'Maya', 'Nanda', 'Oscar', 'Putri', 'Reza', 'Sari', 'Taufik', 'Umi'];
+        $lastNames = ['Wijaya', 'Santoso', 'Kusuma', 'Purnama', 'Pratama', 'Hidayat', 'Saputra', 'Wibowo', 'Setiawan', 'Nugraha'];
+        $buyerMap = [];
+
+        for ($i = 0; $i < 60; $i++) {
+            $firstName = $firstNames[array_rand($firstNames)];
+            $lastName = $lastNames[array_rand($lastNames)];
+            $buyer = Buyer::create([
+                'name' => "{$firstName} {$lastName}",
+                'phone' => '08' . rand(1, 9) . rand(10000000, 99999999),
+                'email' => strtolower("{$firstName}.{$lastName}" . rand(1, 99) . '@email.com'),
+                'address' => 'Jl. Sudirman No. ' . rand(1, 100) . ', Jakarta',
+            ]);
+            $buyerMap[] = $buyer->id;
+        }
+
+        // Sales & Payments (2023-2025)
+        shuffle($lotMap);
+        $salesDistribution = [2023 => 25, 2024 => 30, 2025 => 30];
+        $lotIndex = 0;
+
+        foreach ($salesDistribution as $year => $count) {
+            for ($i = 0; $i < $count && $lotIndex < count($lotMap); $i++) {
+                $lotId = $lotMap[$lotIndex++];
+                $lot = Lot::find($lotId);
+
+                $bookingDate = \Carbon\Carbon::create($year, rand(1, 12), rand(1, 28));
+                if ($bookingDate->gt($today)) {
+                    $bookingDate = $today->copy()->subDays(rand(1, 30));
+                }
+
+                $price = (int) ($lot->base_price * (1 + rand(-5, 10) / 100));
+
+                // 60% installment, 30% cash, 10% KPR
+                $methodRand = rand(1, 100);
+                if ($methodRand <= 60) {
+                    $paymentMethod = 'installment';
+                    $tenor = [12, 24, 36, 48][array_rand([12, 24, 36, 48])];
+                    $dpPercent = rand(20, 40);
+                } elseif ($methodRand <= 90) {
+                    $paymentMethod = 'cash';
+                    $tenor = 0;
+                    $dpPercent = 100;
+                } else {
+                    $paymentMethod = 'kpr';
+                    $tenor = 0;
+                    $dpPercent = rand(15, 30);
+                }
+
+                $downPayment = (int) ($price * $dpPercent / 100);
+                $paidAmount = 0;
+
+                $sale = Sale::create([
+                    'lot_id' => $lotId,
+                    'buyer_id' => $buyerMap[array_rand($buyerMap)],
+                    'marketer_id' => $marketerMap[array_rand($marketerMap)],
+                    'booking_date' => $bookingDate->format('Y-m-d'),
+                    'payment_method' => $paymentMethod,
+                    'price' => $price,
+                    'down_payment' => $downPayment,
+                    'tenor_months' => $tenor,
+                    'due_day' => rand(1, 28),
+                    'paid_amount' => 0,
+                    'outstanding_amount' => $price,
+                    'status' => 'active',
+                ]);
+
+                // Create payments
+                if ($paymentMethod === 'cash') {
+                    Payment::create([
+                        'sale_id' => $sale->id,
+                        'due_date' => $bookingDate->format('Y-m-d'),
+                        'amount' => $price,
+                        'status' => 'paid',
+                        'note' => 'Pembayaran Cash',
+                        'paid_at' => $bookingDate->format('Y-m-d'),
+                    ]);
+                    $paidAmount = $price;
+                } elseif ($paymentMethod === 'kpr') {
+                    Payment::create([
+                        'sale_id' => $sale->id,
+                        'due_date' => $bookingDate->format('Y-m-d'),
+                        'amount' => $downPayment,
+                        'status' => 'paid',
+                        'note' => 'DP (KPR)',
+                        'paid_at' => $bookingDate->format('Y-m-d'),
+                    ]);
+                    Payment::create([
+                        'sale_id' => $sale->id,
+                        'due_date' => $bookingDate->copy()->addDays(30)->format('Y-m-d'),
+                        'amount' => $price - $downPayment,
+                        'status' => 'paid',
+                        'note' => 'Pelunasan KPR Bank',
+                        'paid_at' => $bookingDate->copy()->addDays(30)->format('Y-m-d'),
+                    ]);
+                    $paidAmount = $price;
+                } else {
+                    // Installment
+                    Payment::create([
+                        'sale_id' => $sale->id,
+                        'due_date' => $bookingDate->format('Y-m-d'),
+                        'amount' => $downPayment,
+                        'status' => 'paid',
+                        'note' => 'Down Payment',
+                        'paid_at' => $bookingDate->format('Y-m-d'),
+                    ]);
+                    $paidAmount = $downPayment;
+
+                    $remaining = $price - $downPayment;
+                    $monthly = (int) ceil($remaining / $tenor);
+
+                    for ($inst = 1; $inst <= $tenor; $inst++) {
+                        $dueDate = $bookingDate->copy()->addMonths($inst);
+                        $amount = ($inst === $tenor) ? $remaining - ($monthly * ($tenor - 1)) : $monthly;
+
+                        if ($dueDate->lte($today)) {
+                            $isPaid = rand(1, 100) <= 85;
+                            $status = $isPaid ? 'paid' : 'unpaid';
+                            $paidAt = $isPaid ? $dueDate->format('Y-m-d') : null;
+                            if ($isPaid) $paidAmount += $amount;
+                        } else {
+                            $status = 'unpaid';
+                            $paidAt = null;
+                        }
+
+                        Payment::create([
+                            'sale_id' => $sale->id,
+                            'due_date' => $dueDate->format('Y-m-d'),
+                            'amount' => $amount,
+                            'status' => $status,
+                            'note' => "Angsuran ke-{$inst}",
+                            'paid_at' => $paidAt,
+                        ]);
+                    }
+                }
+
+                // Update sale totals
+                $outstanding = max(0, $price - $paidAmount);
+                $sale->update([
+                    'paid_amount' => $paidAmount,
+                    'outstanding_amount' => $outstanding,
+                    'status' => $outstanding <= 0 ? 'paid_off' : 'active',
+                ]);
+
+                // Update lot status
+                $lot->update(['status' => 'sold']);
+            }
+        }
+
+        // Update project statistics
+        foreach (Project::all() as $project) {
+            $project->total_units = $project->lots()->count();
+            $project->sold_units = $project->lots()->where('status', 'sold')->count();
+            $project->save();
+        }
     }
 
     private function importDemoData(array $data): void

@@ -51,12 +51,52 @@ class AppServiceProvider extends ServiceProvider
 
                 $overdueCount = 0;
                 $overduePayments = collect();
-                if (Schema::hasTable('payments')) {
-                    $overdueQuery = Payment::with(['sale.buyer', 'sale.lot'])
+                if (Schema::hasTable('payments') && Schema::hasTable('sales')) {
+                    $today = Carbon::today();
+                    
+                    // Group by buyer - get unique buyers with all their overdue info
+                    $overduePayments = Payment::with(['sale.buyer', 'sale.lot.project'])
                         ->where('status', 'unpaid')
-                        ->whereDate('due_date', '<', Carbon::today());
-                    $overdueCount = $overdueQuery->count();
-                    $overduePayments = $overdueQuery->orderBy('due_date', 'asc')->limit(50)->get();
+                        ->whereDate('due_date', '<', $today)
+                        ->whereHas('sale.buyer')
+                        ->get()
+                        ->groupBy(fn($payment) => $payment->sale?->buyer_id)
+                        ->map(function ($payments) {
+                            // Sum total overdue amount for this buyer
+                            $totalAmount = $payments->sum('amount');
+                            $overdueCount = $payments->count();
+                            $oldestPayment = $payments->sortBy('due_date')->first();
+                            
+                            // Collect all unique kavling (sale) info for this buyer
+                            $kavlingList = $payments->groupBy(fn($p) => $p->sale_id)
+                                ->map(function ($salePayments) {
+                                    $sale = $salePayments->first()->sale;
+                                    $lot = $sale?->lot;
+                                    $projectName = $lot?->project?->name ?? '';
+                                    $blockNumber = $lot?->block_number ?? '';
+                                    return [
+                                        'sale_id' => $sale->id,
+                                        'kavling' => trim($projectName . ' / ' . $blockNumber, ' /'),
+                                        'amount' => $salePayments->sum('amount'),
+                                        'count' => $salePayments->count(),
+                                    ];
+                                })
+                                ->values()
+                                ->toArray();
+                            
+                            // Attach summary info to the payment object
+                            $oldestPayment->total_overdue_amount = $totalAmount;
+                            $oldestPayment->overdue_payment_count = $overdueCount;
+                            $oldestPayment->kavling_list = $kavlingList;
+                            
+                            return $oldestPayment;
+                        })
+                        ->sortBy('due_date')
+                        ->values()
+                        ->take(50);
+                    
+                    // Count = jumlah orang (buyer) yang memiliki tunggakan
+                    $overdueCount = $overduePayments->count();
                 }
 
                 $view->with('companyProfile', $companyProfile)

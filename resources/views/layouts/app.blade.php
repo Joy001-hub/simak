@@ -193,7 +193,7 @@
         <div class="bell-panel-header">
             <div>
                 <div class="bell-title">Daftar Penagihan Mendesak</div>
-                <div class="bell-sub">Total {{ $overdueCount ?? 0 }} pelanggan memiliki angsuran yang telah jatuh tempo.
+                <div class="bell-sub">Total {{ $overdueCount ?? 0 }} angsuran dari {{ count($overduePayments ?? []) }} pelanggan telah jatuh tempo.
                 </div>
             </div>
             <button id="bellClose" type="button" aria-label="Tutup notifikasi"
@@ -204,6 +204,9 @@
                 @php
                     $sale = $payment->sale;
                     $buyer = optional($sale)->buyer;
+                    $totalOverdue = $payment->total_overdue_amount ?? $payment->amount;
+                    $overduePaymentCount = $payment->overdue_payment_count ?? 1;
+                    $kavlingList = $payment->kavling_list ?? [];
                     $lateDaysRaw = $payment->due_date ? \Carbon\Carbon::parse($payment->due_date)->diffInDays(\Carbon\Carbon::now()) : 0;
                     $lateDays = max(0, (int) $lateDaysRaw);
                     $totalMonths = intdiv($lateDays, 30);
@@ -228,16 +231,20 @@
                         <strong class="bell-card-name">{{ $buyer->name ?? 'Tidak diketahui' }}</strong>
                         <div class="bell-card-info">
                             <div class="bell-info-row">
-                                <span class="bell-info-label">Total</span>
+                                <span class="bell-info-label">{{ $overduePaymentCount }} angsuran tertunggak</span>
+                                @if(count($kavlingList) > 1)
+                                    <span class="bell-info-kavling" style="font-size:11px; color:#64748b;">({{ count($kavlingList) }} kavling)</span>
+                                @endif
                                 <br />
-                                <span class="bell-info-value">Tunggakan: Rp
-                                    {{ number_format($payment->amount, 0, ',', '.') }}</span>
+                                <span class="bell-info-value">Total: Rp {{ number_format($totalOverdue, 0, ',', '.') }}</span>
                             </div>
                             <span class="bell-info-late">Terlambat {{ $lateLabel }}</span>
                         </div>
                     </div>
-                    @if($sale)
-                        <a class="bell-btn" href="{{ route('penjualan.show', $sale->id) }}">Lihat Detail</a>
+                    @if(count($kavlingList) === 1)
+                        <a class="bell-btn" href="{{ route('penjualan.show', $kavlingList[0]['sale_id']) }}">Lihat Detail</a>
+                    @else
+                        <button type="button" class="bell-btn bell-btn-popup" data-kavling='@json($kavlingList)' data-buyer="{{ $buyer->name ?? 'Pembeli' }}">Lihat Detail</button>
                     @endif
                 </div>
             @empty
@@ -406,6 +413,108 @@
             font-size: 12px;
             margin: 4px 0 0;
         }
+
+        /* Kavling Popup Modal */
+        .kavling-popup-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .kavling-popup-overlay.active {
+            display: flex;
+        }
+        .kavling-popup {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            max-width: 360px;
+            width: 100%;
+            overflow: hidden;
+            animation: popupIn 0.2s ease;
+        }
+        @keyframes popupIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .kavling-popup-header {
+            background: linear-gradient(145deg, #b91c3b, #9a1630);
+            color: #fff;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .kavling-popup-title {
+            font-weight: 700;
+            font-size: 15px;
+        }
+        .kavling-popup-close {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+            opacity: 0.8;
+        }
+        .kavling-popup-close:hover {
+            opacity: 1;
+        }
+        .kavling-popup-body {
+            padding: 16px 20px;
+        }
+        .kavling-popup-subtitle {
+            color: #6b7280;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+        .kavling-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .kavling-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            text-decoration: none;
+            color: #1f2937;
+            transition: all 0.15s ease;
+        }
+        .kavling-item:hover {
+            background: #fee2e2;
+            border-color: #fca5a5;
+        }
+        .kavling-item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .kavling-item-name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .kavling-item-detail {
+            font-size: 11px;
+            color: #6b7280;
+        }
+        .kavling-item-arrow {
+            color: #9ca3af;
+            font-size: 18px;
+        }
+        .kavling-item:hover .kavling-item-arrow {
+            color: #b91c3b;
+        }
     </style>
     <script>
         (function () {
@@ -446,6 +555,76 @@
 
     {{-- Include Maintenance Modal Component --}}
     @include('components.maintenance-modal')
+
+    {{-- Kavling Selection Popup --}}
+    <div id="kavlingPopupOverlay" class="kavling-popup-overlay">
+        <div class="kavling-popup">
+            <div class="kavling-popup-header">
+                <span class="kavling-popup-title" id="kavlingPopupTitle">Pilih Kavling</span>
+                <button type="button" class="kavling-popup-close" id="kavlingPopupClose">&times;</button>
+            </div>
+            <div class="kavling-popup-body">
+                <div class="kavling-popup-subtitle">Pembeli ini memiliki tunggakan di beberapa kavling:</div>
+                <div class="kavling-list" id="kavlingList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Kavling popup handler
+        (function() {
+            const overlay = document.getElementById('kavlingPopupOverlay');
+            const popupTitle = document.getElementById('kavlingPopupTitle');
+            const kavlingList = document.getElementById('kavlingList');
+            const closeBtn = document.getElementById('kavlingPopupClose');
+
+            function formatRupiah(num) {
+                return 'Rp ' + num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            }
+
+            function showKavlingPopup(buyerName, kavlings) {
+                popupTitle.textContent = buyerName;
+                kavlingList.innerHTML = kavlings.map(k => `
+                    <a href="/penjualan/${k.sale_id}" class="kavling-item">
+                        <div class="kavling-item-info">
+                            <span class="kavling-item-name">${k.kavling || 'Kavling'}</span>
+                            <span class="kavling-item-detail">${k.count} angsuran · ${formatRupiah(k.amount)}</span>
+                        </div>
+                        <span class="kavling-item-arrow">→</span>
+                    </a>
+                `).join('');
+                overlay.classList.add('active');
+            }
+
+            function closePopup() {
+                overlay.classList.remove('active');
+            }
+
+            // Event listeners
+            closeBtn?.addEventListener('click', closePopup);
+            overlay?.addEventListener('click', (e) => {
+                if (e.target === overlay) closePopup();
+            });
+
+            // Handle popup button clicks
+            document.addEventListener('click', (e) => {
+                const btn = e.target.closest('.bell-btn-popup');
+                if (btn) {
+                    e.preventDefault();
+                    const kavlings = JSON.parse(btn.dataset.kavling || '[]');
+                    const buyerName = btn.dataset.buyer || 'Pembeli';
+                    showKavlingPopup(buyerName, kavlings);
+                }
+            });
+
+            // Close on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && overlay.classList.contains('active')) {
+                    closePopup();
+                }
+            });
+        })();
+    </script>
 
     {{-- Check untuk license validation failure --}}
     <script>
