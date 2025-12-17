@@ -144,50 +144,83 @@ class DataManagementController extends Controller
 
             $saleMap = [];
             foreach ($data['sales'] ?? [] as $s) {
-                $price = $s['grand_total'] ?? $s['harga_netto'] ?? 0;
-                $dp = $s['dp_terbayar'] ?? $s['uang_muka_rp'] ?? 0;
-                $tenor = $s['tenor'] ?? 0;
+                // Support both old format (kavling_id) and new format (lot_id)
+                $lotIdKey = $s['lot_id'] ?? $s['kavling_id'] ?? null;
+                $lotId = $lotMap[$lotIdKey] ?? null;
+                
+                // Support both old format (customer_id) and new format (buyer_id)
+                $buyerIdKey = $s['buyer_id'] ?? $s['customer_id'] ?? null;
+                $buyerId = $buyerMap[$buyerIdKey] ?? null;
+                
+                // Support both old format (sales_id) and new format (marketer_id)
+                $marketerIdKey = $s['marketer_id'] ?? $s['sales_id'] ?? null;
+                $marketerId = $marketerMap[$marketerIdKey] ?? null;
+                
+                // Skip sale if lot_id is null (required field)
+                if (!$lotId) {
+                    logger()->warning('[Restore] Skipping sale with invalid lot_id', ['sale_data' => $s]);
+                    continue;
+                }
+                
+                $price = $s['price'] ?? $s['grand_total'] ?? $s['harga_netto'] ?? 0;
+                $dp = $s['down_payment'] ?? $s['dp_terbayar'] ?? $s['uang_muka_rp'] ?? 0;
+                $tenor = $s['tenor_months'] ?? $s['tenor'] ?? 0;
+                $dueDay = $s['due_day'] ?? $s['jatuh_tempo_hari'] ?? null;
+                $bookingDate = $s['booking_date'] ?? $s['invoice_date'] ?? null;
+                $paymentMethod = $s['payment_method'] ?? ($tenor > 0 ? 'installment' : 'cash');
+                $status = $s['status'] ?? 'active';
+                $paidAmount = $s['paid_amount'] ?? 0;
+                $outstandingAmount = $s['outstanding_amount'] ?? $price;
+                
                 $sale = Sale::create([
-                    'lot_id' => $lotMap[$s['kavling_id'] ?? null] ?? null,
-                    'buyer_id' => $buyerMap[$s['customer_id'] ?? null] ?? null,
-                    'marketer_id' => $marketerMap[$s['sales_id'] ?? null] ?? null,
-                    'booking_date' => $s['invoice_date'] ?? null,
-                    'payment_method' => $tenor > 0 ? 'installment' : 'cash',
+                    'lot_id' => $lotId,
+                    'buyer_id' => $buyerId,
+                    'marketer_id' => $marketerId,
+                    'booking_date' => $bookingDate,
+                    'payment_method' => $paymentMethod,
                     'price' => $price,
                     'down_payment' => $dp,
                     'tenor_months' => $tenor,
-                    'due_day' => $s['jatuh_tempo_hari'] ?? null,
-                    'paid_amount' => 0,
-                    'outstanding_amount' => $price,
-                    'status' => 'active',
+                    'due_day' => $dueDay,
+                    'paid_amount' => $paidAmount,
+                    'outstanding_amount' => $outstandingAmount,
+                    'status' => $status,
                 ]);
                 $saleMap[$s['id'] ?? null] = $sale->id;
 
                 if ($dp > 0) {
                     Payment::create([
                         'sale_id' => $sale->id,
-                        'due_date' => $s['invoice_date'] ?? null,
+                        'due_date' => $bookingDate,
                         'amount' => $dp,
                         'status' => 'paid',
                         'note' => 'Down Payment',
-                        'paid_at' => $s['invoice_date'] ?? null,
+                        'paid_at' => $bookingDate,
                     ]);
                 }
             }
 
-            foreach ($data['installments'] ?? [] as $ins) {
-                $saleId = $saleMap[$ins['sale_id'] ?? null] ?? null;
+            // Support both old format (installments) and new format (payments)
+            $paymentsList = $data['payments'] ?? $data['installments'] ?? [];
+            foreach ($paymentsList as $pmt) {
+                $saleId = $saleMap[$pmt['sale_id'] ?? null] ?? null;
                 if (!$saleId) {
                     continue;
                 }
 
+                // Determine status
+                $status = $pmt['status'] ?? 'unpaid';
+                if (!in_array($status, ['paid', 'unpaid', 'overdue'])) {
+                    $status = $status === 'paid' ? 'paid' : 'unpaid';
+                }
+
                 Payment::create([
                     'sale_id' => $saleId,
-                    'due_date' => $ins['due_date'] ?? null,
-                    'amount' => $ins['amount'] ?? 0,
-                    'status' => ($ins['status'] ?? 'unpaid') === 'paid' ? 'paid' : 'unpaid',
-                    'note' => 'Angsuran ke-' . ($ins['installment_number'] ?? '-'),
-                    'paid_at' => $ins['payment_date'] ?? null,
+                    'due_date' => $pmt['due_date'] ?? null,
+                    'amount' => $pmt['amount'] ?? 0,
+                    'status' => $status,
+                    'note' => $pmt['note'] ?? (isset($pmt['installment_number']) ? 'Angsuran ke-' . $pmt['installment_number'] : null),
+                    'paid_at' => $pmt['paid_at'] ?? $pmt['payment_date'] ?? null,
                 ]);
             }
 
