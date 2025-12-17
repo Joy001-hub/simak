@@ -350,6 +350,13 @@ export class LicenseService {
 
             const data: LicenseResponse = await response.json();
 
+            // FALLBACK: If server returns valid:false, force delete license.json and redirect
+            if (!data.valid) {
+                console.warn('[License] Server returned valid:false on reset, forcing local license deletion');
+                await this.forceRevokeAndRedirect();
+                return { success: true, message: data.message || 'Lisensi tidak valid. Mengarahkan ke halaman aktivasi...' };
+            }
+
             // Clear local data regardless of server response
             await this.clearLicenseData();
 
@@ -364,11 +371,7 @@ export class LicenseService {
                 errorMessage: null,
             });
 
-            if (data.valid) {
-                return { success: true, message: 'Lisensi berhasil di-reset. Silakan aktivasi di device baru.' };
-            } else {
-                return { success: true, message: data.message || 'Data lisensi lokal dihapus' };
-            }
+            return { success: true, message: 'Lisensi berhasil di-reset. Silakan aktivasi di device baru.' };
         } catch (error) {
             // Still clear local data on error
             await this.clearLicenseData();
@@ -378,6 +381,58 @@ export class LicenseService {
                 isLoading: false,
             });
             return { success: true, message: 'Data lisensi lokal dihapus (offline)' };
+        }
+    }
+
+    /**
+     * Force revoke license locally and redirect to activation page
+     * Called when server returns valid:false on sejoli-delete-license
+     */
+    async forceRevokeAndRedirect(): Promise<void> {
+        try {
+            // Call backend API to force delete license.json
+            const response = await fetch('/api/license/force-revoke', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+            });
+
+            const result = await response.json();
+            console.log('[License] Force revoke result:', result);
+
+            // Clear all local data
+            await this.clearLicenseData();
+
+            this.updateState({
+                isValid: false,
+                isActivated: false,
+                isLoading: false,
+                subscriptionStatus: null,
+                expirationDate: null,
+                productName: null,
+                lastValidated: null,
+                errorMessage: 'Lisensi tidak valid. Silakan aktivasi ulang.',
+            });
+
+            // Force redirect to activation page
+            if (result.redirect) {
+                window.location.href = result.redirect;
+            } else {
+                // Fallback redirect path
+                window.location.href = '/license/activate';
+            }
+        } catch (error) {
+            console.error('[License] Force revoke failed:', error);
+            // Still clear local data and redirect
+            await this.clearLicenseData();
+            this.updateState({
+                isValid: false,
+                isActivated: false,
+                isLoading: false,
+            });
+            window.location.href = '/license/activate';
         }
     }
 
