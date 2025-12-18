@@ -1,5 +1,6 @@
 # Dependencies
 /node_modules
+/no_modules
 /vendor
 
 # Environment files
@@ -18,7 +19,6 @@
 !/bootstrap/cache/.gitkeep
 
 # Build outputs
-/public/build
 /public/hot
 /public/storage
 

@@ -1,0 +1,26 @@
+{
+  "index.html": {
+    "file": "assets/main-BowfLJGj.js",
+    "name": "main",
+    "src": "index.html",
+    "isEntry": true,
+    "css": [
+      "assets/main-SU9inHsb.css"
+    ]
+  },
+  "resources/css/app.css": {
+    "file": "assets/style-XYZlc7ll.css",
+    "src": "resources/css/app.css",
+    "isEntry": true,
+    "name": "style",
+    "names": [
+      "style.css"
+    ]
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-Bnx-iJx9.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true
+  }
+}
