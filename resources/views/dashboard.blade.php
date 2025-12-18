@@ -1,261 +1,312 @@
 ﻿@extends('layouts.app')
 
-@section('content')
-    <div class="space-y-8">
-        <div class="page-heading flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <div>
-                <h1 class="heading-title text-2xl font-bold text-gray-900">Dashboard</h1>
-            </div>
-
-            <form method="GET" action="{{ route('dashboard') }}" class="filter-row flex flex-wrap items-center gap-2"
-                id="periodForm">
-                @foreach ($periodOptions as $option)
-                    <button type="submit" name="periode" value="{{ $option }}"
-                        class="chip px-4 py-2 rounded-full text-sm font-medium transition-colors {{ $option === $activePeriod ? 'bg-blue-600 text-white is-active' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
-                        {{ $option }}
-                    </button>
-                @endforeach
-
-                <button type="button"
-                    class="chip px-4 py-2 rounded-full text-sm font-medium transition-colors {{ $activePeriod === 'Kustom' ? 'bg-blue-600 text-white is-active' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 ghost' }}"
-                    id="customToggle">
-                    Kustom
-                </button>
-
-                <input type="hidden" name="compare" value="0">
-
-                <label class="checkbox flex items-center gap-2 cursor-pointer ml-2"
-                    title="Bandingkan tidak tersedia untuk periode &quot;Semua&quot;.">
-                    <input type="checkbox" name="compare" value="1" id="compareToggle"
-                        class="rounded text-blue-600 focus:ring-blue-500" {{ $compareEnabled ? 'checked' : '' }} {{ $activePeriod === 'Semua' ? 'disabled' : '' }}>
-                    <span class="text-sm text-gray-700">Bandingkan</span>
-                </label>
-
-                <div id="customRange" style="display: {{ $activePeriod === 'Kustom' ? 'flex' : 'none' }};"
-                    class="w-full lg:w-auto flex flex-wrap items-center gap-2 mt-2 lg:mt-0 lg:ml-2">
-                    <input type="date" name="custom_from" class="input border-gray-300 rounded-md shadow-sm text-sm"
-                        value="{{ request('custom_from') }}">
-                    <input type="date" name="custom_to" class="input border-gray-300 rounded-md shadow-sm text-sm"
-                        value="{{ request('custom_to') }}">
-                    <button type="submit" name="periode" value="Kustom"
-                        class="btn primary bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700">Terapkan</button>
-            </form>
-        </div>
-
-        <style>
-            .summary-grid {
-                width: 100%;
-            }
-
-            .summary-grid .card {
-                flex: 1;
-            }
-
-            @media (min-width: 1080px) {
-                .summary-grid .wide-card {
-                    grid-column: span 2;
+@push('styles')
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#8B5CF6",
+                        "primary-hover": "#7C3AED",
+                        "sidebar-bg": "#FFFFFF",
+                        "main-bg": "#F8FAFC",
+                        "card-bg": "#FFFFFF",
+                        "card-border": "#E2E8F0",
+                        "text-main": "#1E293B",
+                        "text-muted": "#64748B",
+                        "chart-red": "#EF4444",
+                        "chart-blue": "#3B82F6",
+                        "chart-orange": "#F97316",
+                        "chart-green": "#22C55E",
+                        "chart-yellow": "#EAB308",
+                        "chart-purple": "#A855F7",
+                        "status-risk": "#EF4444",
+                        "status-warning": "#EAB308",
+                        "status-safe": "#22C55E",
+                    },
+                    fontFamily: {
+                        display: "Inter, sans-serif"
+                    },
+                    boxShadow: {
+                        'card': '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)',
+                    }
                 }
             }
-        </style>
+        };
+    </script>
+    <style>
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
 
-        <div class="summary-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .chart-grid line {
+            stroke: #CBD5E1;
+            stroke-opacity: 0.6;
+        }
+
+        .chart-text {
+            fill: #64748B;
+            font-size: 10px;
+        }
+    </style>
+@endpush
+
+@section('content')
+    <div class="font-display text-text-main">
+        {{-- Header Section --}}
+        <header class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h2 class="text-xl font-bold text-text-main tracking-tight">Dashboard Overview</h2>
+                <p class="text-xs text-slate-500 font-normal mt-1">Welcome back, here's what's happening today.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-4">
+                <form method="GET" action="{{ route('dashboard') }}" class="flex flex-wrap items-center gap-2"
+                    id="periodForm">
+                    <div class="flex items-center bg-slate-100 rounded p-1 border border-slate-200">
+                        @foreach ($periodOptions as $option)
+                            <button type="submit" name="periode" value="{{ $option }}"
+                                class="px-3 py-1.5 text-xs font-medium rounded transition-all {{ $option === $activePeriod ? 'text-white bg-primary shadow-sm font-semibold' : 'text-slate-600 hover:text-text-main' }}">
+                                {{ $option }}
+                            </button>
+                        @endforeach
+                    </div>
+
+                    <input type="hidden" name="compare" value="0">
+
+                    <label
+                        class="flex items-center gap-2 px-3 py-2 rounded bg-slate-100 border border-slate-200 cursor-pointer hover:border-slate-300 transition-colors h-[38px]"
+                        title="Bandingkan tidak tersedia untuk periode &quot;Semua&quot;.">
+                        <input type="checkbox" name="compare" value="1" id="compareToggle"
+                            class="rounded border-slate-300 bg-transparent text-primary focus:ring-0 focus:ring-offset-0 size-4"
+                            {{ $compareEnabled ? 'checked' : '' }} {{ $activePeriod === 'Semua' ? 'disabled' : '' }}>
+                        <span class="text-xs text-slate-600 font-medium select-none">Bandingkan</span>
+                    </label>
+
+                    {{-- Custom Date Range --}}
+                    <button type="button"
+                        class="px-3 py-1.5 text-xs font-medium rounded transition-all {{ $activePeriod === 'Kustom' ? 'text-white bg-primary shadow-sm font-semibold' : 'text-slate-600 hover:text-text-main bg-slate-100 border border-slate-200' }}"
+                        id="customToggle">
+                        Kustom
+                    </button>
+
+                    <div id="customRange" style="display: {{ $activePeriod === 'Kustom' ? 'flex' : 'none' }};"
+                        class="flex flex-wrap items-center gap-2 mt-2 lg:mt-0">
+                        <input type="date" name="custom_from"
+                            class="px-3 py-1.5 text-xs border border-slate-200 rounded-md shadow-sm"
+                            value="{{ request('custom_from') }}">
+                        <input type="date" name="custom_to"
+                            class="px-3 py-1.5 text-xs border border-slate-200 rounded-md shadow-sm"
+                            value="{{ request('custom_to') }}">
+                        <button type="submit" name="periode" value="Kustom"
+                            class="px-4 py-1.5 text-xs font-semibold text-white bg-primary rounded-md hover:bg-primary-hover">Terapkan</button>
+                    </div>
+                </form>
+            </div>
+        </header>
+
+        {{-- Summary Cards Grid --}}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             @forelse ($summary as $card)
                 @php
                     $isWideCard = in_array($card['label'], ['Total Piutang (Global)', 'Nilai Persediaan Kavling']);
                 @endphp
-                <article
-                    class="card bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col justify-between h-full min-h-[170px] sm:min-h-[190px] {{ $isWideCard ? 'wide-card' : '' }}"
-                    style="gap:8px;">
-                    <div class="card-header flex justify-between items-start mb-4">
-                        <span class="card-label text-gray-500 text-sm font-medium truncate">{{ $card['label'] }}</span>
-                        <span class="pill soft bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">Realtime</span>
-                    </div>
-
-                    <div class="stat mb-4" style="align-items:flex-start; gap:6px;">
-                        @if (!empty($card['isUnit']))
-                            <div class="flex items-baseline gap-1 mb-1">
-                                <span class="stat-value text-2xl font-bold text-gray-900">{{ number_format($card['value']) }}</span>
-                                <span class="stat-unit text-sm text-gray-500">unit</span>
-                            </div>
-                        @else
-                            <span class="stat-value text-2xl font-bold text-gray-900">Rp
-                                {{ number_format($card['value'], 0, ',', '.') }}</span>
-                        @endif
-
+                <div
+                    class="bg-card-bg p-5 rounded-lg border border-card-border flex flex-col shadow-card hover:border-slate-300 transition-colors {{ $isWideCard ? 'lg:col-span-2' : '' }}">
+                    <div class="flex justify-between items-start mb-2">
+                        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wide leading-tight">
+                            {!! nl2br(e($card['label'])) !!}</p>
                         @if (!empty($card['trend']))
                             @php
                                 $dir = $card['trend']['direction'] ?? 'up';
-                                $delta = abs($card['trend']['delta'] ?? 0);
                                 $isUp = $dir === 'up';
-                                $textClasses = $isUp ? 'text-green-700' : 'text-red-700';
                             @endphp
-                            <div class="w-full mt-1 leading-tight">
-                                <span class="trend-inline {{ $textClasses }}">
-                                    <span aria-hidden="true">{!! $isUp ? '&#8593;' : '&#8595;' !!}</span>
-                                    <span>{{ number_format($delta, 1) }}% vs periode lalu</span>
-                                </span>
-                            </div>
+                            <span class="material-symbols-outlined text-sm {{ $isUp ? 'text-emerald-500' : 'text-red-500' }}">
+                                {{ $isUp ? 'trending_up' : 'trending_down' }}
+                            </span>
+                        @else
+                            <span class="material-symbols-outlined text-blue-500 text-sm">payments</span>
                         @endif
                     </div>
 
-                    @if (!empty($card['statuses']))
-                        <div class="progress-multi flex h-2 rounded-full overflow-hidden mb-3 bg-gray-100">
-                            @foreach ($card['statuses'] as $status)
-                                <span class="progress-slice h-full"
-                                    style="width: {{ $status['value'] * 100 }}%; background: {{ $status['color'] }};"></span>
-                            @endforeach
-                        </div>
-                        <div class="legend-row flex flex-wrap gap-3">
-                            @foreach ($card['statuses'] as $status)
-                                <span class="legend flex items-center gap-1 text-xs text-gray-600">
-                                    <span class="legend-dot w-2 h-2 rounded-full"
-                                        style="background: {{ $status['color'] }};"></span>{{ $status['label'] }}
-                                </span>
-                            @endforeach
-                        </div>
-                    @endif
+                    <div class="flex items-baseline gap-1 mt-1">
+                        @if (!empty($card['isUnit']))
+                            <h3 class="text-2xl font-bold text-text-main tracking-tight">{{ number_format($card['value']) }}</h3>
+                            <span class="text-sm font-normal text-slate-500">Unit</span>
+                        @else
+                            <span class="text-sm font-medium text-slate-500">IDR</span>
+                            <h3 class="text-2xl font-bold text-text-main tracking-tight">
+                                {{ number_format($card['value'], 0, ',', '.') }}</h3>
+                        @endif
+                    </div>
 
-                    @if (!empty($card['inventories']))
-                        <div class="progress-multi flex h-2 rounded-full overflow-hidden mb-3 bg-gray-100">
-                            @foreach ($card['inventories'] as $inventory)
-                                <span class="progress-slice h-full"
-                                    style="width: {{ $inventory['value'] * 100 }}%; background: {{ $inventory['color'] }};"></span>
-                            @endforeach
-                        </div>
-                        <div class="legend-row flex flex-wrap gap-3">
-                            @foreach ($card['inventories'] as $inventory)
-                                <span class="legend flex items-center gap-1 text-xs text-gray-600">
-                                    <span class="legend-dot w-2 h-2 rounded-full"
-                                        style="background: {{ $inventory['color'] }};"></span>{{ $inventory['label'] }}
-                                </span>
-                            @endforeach
-                        </div>
+                    @if (!empty($card['trend']))
+                        @php
+                            $dir = $card['trend']['direction'] ?? 'up';
+                            $delta = abs($card['trend']['delta'] ?? 0);
+                            $isUp = $dir === 'up';
+                            $textClasses = $isUp ? 'text-emerald-500' : 'text-red-500';
+                        @endphp
+                        <p class="text-[10px] {{ $textClasses }} mt-1">
+                            {!! $isUp ? '&#8593;' : '&#8595;' !!} {{ number_format($delta, 1) }}% vs periode lalu
+                        </p>
                     @endif
 
                     @if (!empty($card['hint']))
-                        <p class="hint text-xs text-gray-400 mt-2">{{ $card['hint'] }}</p>
+                        <p class="text-[10px] text-slate-400 mt-1">{{ $card['hint'] }}</p>
                         @if (!empty($card['previous']))
-                            <p class="hint text-xs text-gray-400 mt-1">Periode lalu:
-                                @if(!empty($card['isUnit'])){{ number_format($card['previous']) }} unit @else Rp
+                            <p class="text-[10px] text-slate-400 mt-1">Periode lalu:
+                                @if(!empty($card['isUnit'])){{ number_format($card['previous']) }} unit @else IDR
                                 {{ number_format($card['previous'], 0, ',', '.') }} @endif
                             </p>
                         @endif
                     @endif
-                </article>
+
+                    {{-- Status Badges --}}
+                    @if (!empty($card['statuses']))
+                        <div class="flex flex-wrap gap-2 mt-auto pt-3">
+                            @foreach ($card['statuses'] as $status)
+                                @php
+                                    $displayLabel = match($status['label']) {
+                                        'Ada Tunggakan' => 'Tunggakan',
+                                        'Jatuh Tempo <7 hari' => 'Perhatian',
+                                        default => $status['label']
+                                    };
+                                @endphp
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                                    style="background: {{ $status['color'] }}15; color: {{ $status['color'] }};">
+                                    <span class="size-1.5 rounded-full mr-1.5" style="background: {{ $status['color'] }};"></span>
+                                    {{ $displayLabel }}: {{ number_format($status['value'] * 100, 0) }}%
+                                </span>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    {{-- Inventory Bars --}}
+                    @if (!empty($card['inventories']))
+                        <div class="mt-auto pt-3 flex flex-col gap-3">
+                            <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden flex">
+                                @foreach ($card['inventories'] as $inventory)
+                                    <div style="width: {{ $inventory['value'] * 100 }}%; background: {{ $inventory['color'] }};"></div>
+                                @endforeach
+                            </div>
+                            @foreach ($card['inventories'] as $inventory)
+                                <div class="flex items-center justify-between text-xs font-medium text-slate-600">
+                                    <span class="flex items-center gap-1.5">
+                                        <span class="size-2 rounded-full" style="background: {{ $inventory['color'] }};"></span>
+                                        {{ $inventory['label'] }}
+                                    </span>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
             @empty
-                <article class="card bg-white rounded-xl shadow-sm p-6 col-span-full text-center">
-                    <div class="card-header mb-2">
-                        <span class="card-label font-bold text-gray-700">Belum ada data</span>
-                    </div>
-                    <p class="hint text-gray-500">Mulai tambahkan penjualan untuk melihat ringkasan.</p>
-                </article>
+                <div class="bg-card-bg p-6 rounded-lg border border-card-border col-span-full text-center shadow-card">
+                    <p class="text-slate-500 font-medium">Belum ada data</p>
+                    <p class="text-xs text-slate-400 mt-1">Mulai tambahkan penjualan untuk melihat ringkasan.</p>
+                </div>
             @endforelse
         </div>
 
-        <div class="space-y-8">
-            <div class="panel-grid grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <section class="panel bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                    <div
-                        class="panel-header flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                        <div>
-                            <h3 class="panel-title text-lg font-bold text-gray-900">Tren Penjualan</h3>
-                            <p class="panel-sub text-sm text-gray-500">Nilai penjualan (juta rupiah) sepanjang tahun
-                                berjalan.</p>
-                        </div>
-                        <div class="flex flex-col items-end gap-2">
-                            <div class="pill-switch bg-gray-100 p-1 rounded-lg flex">
-                                <button class="chip small px-3 py-1 rounded-md text-xs font-medium is-active transition-all"
-                                    data-toggle="sales-mode" data-mode="value">Nilai (Rp)</button>
-                                <button
-                                    class="chip small px-3 py-1 rounded-md text-xs font-medium text-gray-500 hover:text-gray-900 transition-all"
-                                    data-toggle="sales-mode" data-mode="unit">Jumlah Unit</button>
-                            </div>
-                            <label class="toggle flex items-center gap-2 cursor-pointer">
-                                <input id="projectionToggle" type="checkbox" checked
-                                    class="rounded text-blue-600 focus:ring-blue-500">
-                                <span class="text-xs text-gray-600">Proyeksi AI</span>
-                            </label>
-                        </div>
-                    </div>
+        {{-- Charts Section - Row 1 --}}
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            {{-- Sales Trend Chart --}}
+            <div class="bg-card-bg rounded-lg border border-card-border p-6 flex flex-col shadow-card h-[380px]">
+                <div class="flex items-start justify-between mb-6">
                     <div>
-                        <div class="w-full h-72 relative px-2 pb-4">
-                            <canvas id="salesTrendChart" class="w-full h-full"></canvas>
-                        </div>
+                        <h3 class="text-base font-bold text-text-main">Tren Penjualan</h3>
+                        <p class="text-xs text-slate-500 mt-1">Performa penjualan bulanan tahun ini</p>
                     </div>
-                </section>
-
-                <section class="panel bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                    <div
-                        class="panel-header flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                        <div>
-                            <h3 class="panel-title text-lg font-bold text-gray-900">Performa Tim Marketing</h3>
-                            <p class="panel-sub text-sm text-gray-500">Nilai closing (juta rupiah) per marketer.</p>
-                        </div>
-                        <div class="pill-switch bg-gray-100 p-1 rounded-lg flex">
-                            <button class="chip small px-3 py-1 rounded-md text-xs font-medium is-active transition-all"
-                                data-toggle="marketing-mode" data-mode="value">Nilai (Rp)</button>
+                    <div class="flex flex-col items-end gap-2">
+                        <div class="flex bg-slate-100 rounded overflow-hidden border border-slate-200">
+                            <button class="px-3 py-1 text-[10px] font-bold bg-primary text-white is-active"
+                                data-toggle="sales-mode" data-mode="value">Nilai (Rp)</button>
                             <button
-                                class="chip small px-3 py-1 rounded-md text-xs font-medium text-gray-500 hover:text-gray-900 transition-all"
-                                data-toggle="marketing-mode" data-mode="unit">Jumlah Unit</button>
+                                class="px-3 py-1 text-[10px] font-medium text-slate-600 hover:text-text-main transition-colors"
+                                data-toggle="sales-mode" data-mode="unit">Unit</button>
                         </div>
+                        <label class="toggle flex items-center gap-2 cursor-pointer">
+                            <input id="projectionToggle" type="checkbox" checked
+                                class="rounded text-primary focus:ring-primary size-3.5">
+                            <span class="text-[10px] text-slate-600">Proyeksi AI</span>
+                        </label>
                     </div>
-                    <div>
-                        <div class="w-full h-72 relative px-2 pb-4">
-                            <canvas id="marketingChart" class="w-full h-full"></canvas>
-                        </div>
-                    </div>
-                </section>
+                </div>
+                <div class="flex-1 w-full relative">
+                    <canvas id="salesTrendChart" class="w-full h-full"></canvas>
+                </div>
             </div>
 
-            <div class="panel-grid grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <section class="panel bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                    <div
-                        class="panel-header flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                        <div>
-                            <h3 class="panel-title text-lg font-bold text-gray-900">Penjualan per Proyek</h3>
-                            <p class="panel-sub text-sm text-gray-500">Nilai & unit terjual per proyek pada periode
-                                aktif.</p>
-                        </div>
-                        <div class="pill-switch bg-gray-100 p-1 rounded-lg flex">
-                            <button class="chip small px-3 py-1 rounded-md text-xs font-medium is-active transition-all"
-                                data-toggle="project-sales-mode" data-mode="value">Nilai (Rp)</button>
-                            <button
-                                class="chip small px-3 py-1 rounded-md text-xs font-medium text-gray-500 hover:text-gray-900 transition-all"
-                                data-toggle="project-sales-mode" data-mode="unit">Jumlah Unit</button>
-                        </div>
-                    </div>
+            {{-- Marketing Performance Chart --}}
+            <div class="bg-card-bg rounded-lg border border-card-border p-6 flex flex-col shadow-card h-[380px]">
+                <div class="flex items-start justify-between mb-6">
                     <div>
-                        <div class="w-full h-72 flex justify-center px-2 pb-4">
-                            <canvas id="projectSalesChart" class="w-full h-full"></canvas>
-                        </div>
+                        <h3 class="text-base font-bold text-text-main">Performa Tim Marketing</h3>
+                        <p class="text-xs text-slate-500 mt-1">Top sales person</p>
                     </div>
-                </section>
+                    <div class="flex bg-slate-100 rounded overflow-hidden border border-slate-200">
+                        <button class="px-3 py-1 text-[10px] font-bold bg-primary text-white is-active"
+                            data-toggle="marketing-mode" data-mode="value">Nilai (Rp)</button>
+                        <button
+                            class="px-3 py-1 text-[10px] font-medium text-slate-600 hover:text-text-main transition-colors"
+                            data-toggle="marketing-mode" data-mode="unit">Unit</button>
+                    </div>
+                </div>
+                <div class="flex-1 w-full relative">
+                    <canvas id="marketingChart" class="w-full h-full"></canvas>
+                </div>
+            </div>
+        </div>
 
-                <section class="panel bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                    <div
-                        class="panel-header flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                        <div>
-                            <h3 class="panel-title text-lg font-bold text-gray-900">Nilai Persediaan per Proyek</h3>
-                            <p class="panel-sub text-sm text-gray-500">Kavling tersedia dan nilai (Rp) per proyek.</p>
-                        </div>
-                        <div class="pill-switch bg-gray-100 p-1 rounded-lg flex">
-                            <button class="chip small px-3 py-1 rounded-md text-xs font-medium is-active transition-all"
-                                data-toggle="inventory-mode" data-mode="value">Nilai (Rp)</button>
-                            <button
-                                class="chip small px-3 py-1 rounded-md text-xs font-medium text-gray-500 hover:text-gray-900 transition-all"
-                                data-toggle="inventory-mode" data-mode="unit">Jumlah Unit</button>
-                        </div>
+        {{-- Charts Section - Row 2 (Doughnut Charts) --}}
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {{-- Project Sales Chart --}}
+            <div class="bg-card-bg rounded-lg border border-card-border p-6 flex flex-col shadow-card h-[320px]">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-base font-bold text-text-main">Penjualan per Proyek</h3>
+                    <div class="flex bg-slate-100 rounded overflow-hidden border border-slate-200">
+                        <button class="px-3 py-1 text-[10px] font-bold bg-primary text-white is-active"
+                            data-toggle="project-sales-mode" data-mode="value">Nilai (Rp)</button>
+                        <button
+                            class="px-3 py-1 text-[10px] font-medium text-slate-600 hover:text-text-main transition-colors"
+                            data-toggle="project-sales-mode" data-mode="unit">Unit</button>
                     </div>
-                    <div>
-                        <div class="w-full h-72 flex justify-center px-2 pb-4">
-                            <canvas id="projectInventoryChart" class="w-full h-full"></canvas>
-                        </div>
+                </div>
+                <div class="flex-1 w-full flex justify-center">
+                    <canvas id="projectSalesChart" class="w-full h-full"></canvas>
+                </div>
+            </div>
+
+            {{-- Project Inventory Chart --}}
+            <div class="bg-card-bg rounded-lg border border-card-border p-6 flex flex-col shadow-card h-[320px]">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-base font-bold text-text-main">Nilai Persediaan per Proyek</h3>
+                    <div class="flex bg-slate-100 rounded overflow-hidden border border-slate-200">
+                        <button class="px-3 py-1 text-[10px] font-bold bg-primary text-white is-active"
+                            data-toggle="inventory-mode" data-mode="value">Nilai (Rp)</button>
+                        <button
+                            class="px-3 py-1 text-[10px] font-medium text-slate-600 hover:text-text-main transition-colors"
+                            data-toggle="inventory-mode" data-mode="unit">Unit</button>
                     </div>
-                </section>
+                </div>
+                <div class="flex-1 w-full flex justify-center">
+                    <canvas id="projectInventoryChart" class="w-full h-full"></canvas>
+                </div>
             </div>
         </div>
     </div>
 @endsection
+
 @push('scripts')
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
@@ -617,7 +668,7 @@
                         {
                             label: 'Nilai (Rp)',
                             data: salesValues,
-                            backgroundColor: '#9c0f2f',
+                            backgroundColor: '#8B5CF6',
                             borderRadius: 10,
                             maxBarThickness: 32
                         },
@@ -658,12 +709,12 @@
                     scales: {
                         x: {
                             grid: { display: false },
-                            ticks: { color: '#6b7280' }
+                            ticks: { color: '#64748B' }
                         },
                         y: {
-                            grid: { color: '#e5e7eb' },
+                            grid: { color: '#E2E8F0' },
                             ticks: {
-                                color: '#6b7280',
+                                color: '#64748B',
                                 callback: value => salesMode === 'unit' ? unitTick(value) : currencyTick(value),
                                 stepSize: buildAxisConfig(maxValue(salesValues, projected), salesMode === 'unit').stepSize,
                             },
@@ -674,7 +725,7 @@
                         legend: {
                             display: true,
                             labels: {
-                                color: '#111827',
+                                color: '#1E293B',
                                 boxWidth: 14,
                                 boxHeight: 14,
                                 usePointStyle: true,
@@ -704,6 +755,7 @@
                 marketingChart.options.scales.y.suggestedMax = axisCfg.suggestedMax;
             };
 
+            const marketingColors = ['#EF4444', '#F97316', '#EAB308', '#22C55E', '#3B82F6', '#8B5CF6', '#EC4899', '#64748B'];
             const marketingChart = new Chart(marketingCtx, {
                 type: 'bar',
                 data: {
@@ -712,9 +764,9 @@
                         {
                             label: 'Nilai (Rp)',
                             data: marketingValues,
-                            backgroundColor: '#9c0f2f',
+                            backgroundColor: marketingLabels.map((_, idx) => marketingColors[idx % marketingColors.length]),
                             borderRadius: 12,
-                            maxBarThickness: 38
+                            maxBarThickness: 40
                         }
                     ]
                 },
@@ -723,12 +775,12 @@
                     scales: {
                         x: {
                             grid: { display: false },
-                            ticks: { color: '#6b7280', maxRotation: 50, minRotation: 30 }
+                            ticks: { color: '#64748B', maxRotation: 50, minRotation: 30 }
                         },
                         y: {
-                            grid: { color: '#e5e7eb' },
+                            grid: { color: '#E2E8F0' },
                             ticks: {
-                                color: '#6b7280',
+                                color: '#64748B',
                                 callback: value => marketingMode === 'unit' ? unitTick(value) : currencyTick(value),
                             },
                             suggestedMax: Math.max(...marketingValues) + 1
@@ -754,7 +806,7 @@
                 return { labels, values };
             };
             let { labels: projectSalesLabels, values: projectSalesValues } = buildProjectSalesData();
-            const projectSalesColors = ['#9c0f2f', '#2563eb', '#f59e0b', '#10b981', '#8b5cf6', '#0ea5e9', '#ef4444', '#6b7280'];
+            const projectSalesColors = ['#3B82F6', '#F97316', '#8B5CF6', '#22C55E', '#EAB308', '#0EA5E9', '#EF4444', '#64748B'];
             const projectSalesChart = new Chart(projectSalesCtx, {
                 type: 'doughnut',
                 data: {
@@ -786,8 +838,12 @@
             projectSalesChips.forEach(chip => {
                 chip.addEventListener('click', () => {
                     projectSalesMode = chip.dataset.mode;
-                    projectSalesChips.forEach(c => c.classList.remove('is-active'));
-                    chip.classList.add('is-active');
+                    projectSalesChips.forEach(c => {
+                        c.classList.remove('bg-primary', 'text-white', 'font-bold');
+                        c.classList.add('text-slate-600', 'font-medium');
+                    });
+                    chip.classList.remove('text-slate-600', 'font-medium');
+                    chip.classList.add('bg-primary', 'text-white', 'font-bold');
                     const { labels, values } = buildProjectSalesData();
                     projectSalesLabels = labels;
                     projectSalesValues = values;
@@ -807,7 +863,7 @@
                 return { labels, values };
             };
             let { labels: inventoryLabels, values: inventoryValues } = buildInventoryData();
-            const inventoryColors = ['#0f9d58', '#9c0f2f', '#2563eb', '#f59e0b', '#6b21a8', '#0ea5e9', '#ef4444', '#6b7280'];
+            const inventoryColors = ['#EAB308', '#A855F7', '#3B82F6', '#22C55E', '#F97316', '#0EA5E9', '#EF4444', '#64748B'];
             const projectInventoryChart = new Chart(projectInventoryCtx, {
                 type: 'doughnut',
                 data: {
@@ -839,8 +895,12 @@
             inventoryChips.forEach(chip => {
                 chip.addEventListener('click', () => {
                     inventoryMode = chip.dataset.mode;
-                    inventoryChips.forEach(c => c.classList.remove('is-active'));
-                    chip.classList.add('is-active');
+                    inventoryChips.forEach(c => {
+                        c.classList.remove('bg-primary', 'text-white', 'font-bold');
+                        c.classList.add('text-slate-600', 'font-medium');
+                    });
+                    chip.classList.remove('text-slate-600', 'font-medium');
+                    chip.classList.add('bg-primary', 'text-white', 'font-bold');
                     const { labels, values } = buildInventoryData();
                     inventoryLabels = labels;
                     inventoryValues = values;
@@ -891,8 +951,12 @@
             salesChips.forEach(chip => {
                 chip.addEventListener('click', () => {
                     salesMode = chip.dataset.mode;
-                    salesChips.forEach(c => c.classList.remove('is-active'));
-                    chip.classList.add('is-active');
+                    salesChips.forEach(c => {
+                        c.classList.remove('bg-primary', 'text-white', 'font-bold');
+                        c.classList.add('text-slate-600', 'font-medium');
+                    });
+                    chip.classList.remove('text-slate-600', 'font-medium');
+                    chip.classList.add('bg-primary', 'text-white', 'font-bold');
                     const rebuilt = buildSalesData();
                     salesLabels = rebuilt.labels;
                     salesValues = rebuilt.values;
@@ -920,8 +984,12 @@
             marketingChips.forEach(chip => {
                 chip.addEventListener('click', () => {
                     marketingMode = chip.dataset.mode;
-                    marketingChips.forEach(c => c.classList.remove('is-active'));
-                    chip.classList.add('is-active');
+                    marketingChips.forEach(c => {
+                        c.classList.remove('bg-primary', 'text-white', 'font-bold');
+                        c.classList.add('text-slate-600', 'font-medium');
+                    });
+                    chip.classList.remove('text-slate-600', 'font-medium');
+                    chip.classList.add('bg-primary', 'text-white', 'font-bold');
                     const { labels, values } = buildMarketingData();
                     marketingChart.data.labels = labels;
                     marketingChart.data.datasets[0].data = values;
@@ -934,31 +1002,16 @@
                 });
             });
 
-            document.querySelectorAll('.filter-row .chip').forEach((chip) => {
-                chip.addEventListener('click', () => {
-                    document.querySelectorAll('.filter-row .chip').forEach(c => {
-                        if (c.id !== 'customToggle') c.classList.remove('is-active');
-                    });
-                    if (chip.id !== 'customToggle') {
-                        document.getElementById('customRange')?.setAttribute('style', 'display:none; gap:8px; align-items:center;');
-                    }
-                });
-            });
-
             const customToggle = document.getElementById('customToggle');
             const customRange = document.getElementById('customRange');
             customToggle?.addEventListener('click', () => {
                 const visible = customRange?.style.display !== 'none';
                 customRange.style.display = visible ? 'none' : 'flex';
-                if (!visible) {
-                    document.querySelectorAll('.filter-row .chip').forEach(c => c.classList.remove('is-active'));
-                    customToggle.classList.add('is-active');
-                }
             });
 
             if (activePeriod === 'Kustom' && customRange) {
                 customRange.style.display = 'flex';
-                customToggle?.classList.add('is-active');
+                customToggle?.classList.add('bg-primary', 'text-white', 'font-semibold');
             }
         })();
     </script>
