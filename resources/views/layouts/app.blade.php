@@ -159,7 +159,7 @@
         </aside>
 
         <div class="content-area">
-            <main class="page">
+            <main class="page" style="padding-bottom: 80px;">
                 @if($errors->any())
                     <div class="card"
                         style="border-left:4px solid #ef4444; padding:16px; background:#fef2f2; color:#991b1b; max-width: 1100px; margin: 0 auto 24px auto; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
@@ -173,6 +173,11 @@
                 @endif
                 @yield('content')
             </main>
+            <footer style="position: fixed; bottom: 0; left: 280px; right: 0; z-index: 20; background: rgba(249, 251, 255, 0.95); border-top: 1px solid #e2e8f0;">
+                <div style="width: 100%; max-width: 1500px; margin: 0 auto; padding: 20px 28px; text-align: center; font-size: 12px; color: #94a3b8; font-weight: 500;">
+                    SIMAK™ &copy; 2025. All rights reserved.
+                </div>
+            </footer>
         </div>
     </div>
     <div id="toast" class="floating-alert" ari&times;live="polite" aria-label="Notifikasi"></div>

@@ -122,7 +122,17 @@
                             </a>
                         </th>
                         <th style="width:140px;">Metode Bayar</th>
-                        <th style="width:140px;">Harga Jual</th>
+                        <th style="width:140px;">
+                            <a href="{{ route('penjualan.index', array_merge(request()->query(), ['sort_by' => 'price', 'sort_dir' => ($filters['sort_by'] === 'price' && ($filters['sort_dir'] ?? 'desc') === 'asc') ? 'desc' : 'asc'])) }}"
+                                class="inline-flex items-center gap-1 text-gray-700">
+                                Harga Jual
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#9ca3af;">
+                                    <path d="M7 15l5 5 5-5" />
+                                    <path d="M7 9l5-5 5 5" />
+                                </svg>
+                            </a>
+                        </th>
                         <th style="width:140px;">
                             <a href="{{ route('penjualan.index', array_merge(request()->query(), ['sort_by' => 'sisa_piutang', 'sort_dir' => ($filters['sort_by'] === 'sisa_piutang' && ($filters['sort_dir'] ?? 'desc') === 'asc') ? 'desc' : 'asc'])) }}"
                                 class="inline-flex items-center gap-1 text-gray-700">
@@ -270,21 +280,21 @@
                         statusColor = '#b45309';
                     }
                     return `<tr>
-                                                <td style="text-align:center; white-space:nowrap;" title="${statusTagihan}">${icon}</td>
-                                                <td style="font-weight:700; color:#0f172a; white-space:nowrap;">${item.kavling ?? '-'}</td>
-                                                <td style="white-space:nowrap;">${item.pembeli ?? '-'}</td>
-                                                <td style="white-space:nowrap;">${item.tgl_booking ?? '-'}</td>
-                                                <td style="white-space:nowrap;">${item.metode_bayar ?? '-'}</td>
-                                                <td style="white-space:nowrap;">Rp ${harga}</td>
-                                                <td style="color:${outstandingRed}; font-weight:700; white-space:nowrap;">Rp ${sisa}</td>
-                                                <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${dpBg}; color:${dpColor}; font-weight:700; white-space:nowrap;">${dpStatus}</span></td>
-                                                <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${statusBg}; color:${statusColor}; font-weight:700; white-space:nowrap;">${saleStatus === 'Paid Off' ? '🤝 ' : ''}${saleStatus || '-'}</span></td>
-                                                <td style="white-space:nowrap;">${item.estimasi_lunas ?? '-'}</td>
-                                                <td style="white-space:nowrap;">${item.marketing ?? '-'}</td>
-                                                <td style="padding-left:14px; white-space: nowrap;">
-                                                    <a href="/penjualan/${item.id}" class="btn light" style="padding:8px 10px; border-color:#e5e7eb;">Detail</a>
-                                                </td>
-                                            </tr>`;
+                                                    <td style="text-align:center; white-space:nowrap;" title="${statusTagihan}">${icon}</td>
+                                                    <td style="font-weight:700; color:#0f172a; white-space:nowrap;">${item.kavling ?? '-'}</td>
+                                                    <td style="white-space:nowrap;">${item.pembeli ?? '-'}</td>
+                                                    <td style="white-space:nowrap;">${item.tgl_booking ?? '-'}</td>
+                                                    <td style="white-space:nowrap;">${item.metode_bayar ?? '-'}</td>
+                                                    <td style="white-space:nowrap;">Rp ${harga}</td>
+                                                    <td style="color:${outstandingRed}; font-weight:700; white-space:nowrap;">Rp ${sisa}</td>
+                                                    <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${dpBg}; color:${dpColor}; font-weight:700; white-space:nowrap;">${dpStatus}</span></td>
+                                                    <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${statusBg}; color:${statusColor}; font-weight:700; white-space:nowrap;">${saleStatus === 'Paid Off' ? '🤝 ' : ''}${saleStatus || '-'}</span></td>
+                                                    <td style="white-space:nowrap;">${item.estimasi_lunas ?? '-'}</td>
+                                                    <td style="white-space:nowrap;">${item.marketing ?? '-'}</td>
+                                                    <td style="padding-left:14px; white-space: nowrap;">
+                                                        <a href="/penjualan/${item.id}" class="btn light" style="padding:8px 10px; border-color:#e5e7eb;">Detail</a>
+                                                    </td>
+                                                </tr>`;
                 }).join('');
             };
 
