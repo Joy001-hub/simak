@@ -139,6 +139,53 @@ class DashboardController extends Controller
         $canceledCount = $canceledSales->count();
         $canceledValue = $canceledSales->sum('price');
         $outstanding = $globalOutstanding;
+
+        // Calculate status percentages for Total Piutang card based on active sales with outstanding amount
+        $today = now()->startOfDay();
+        $sevenDaysFromNow = now()->addDays(7)->endOfDay();
+
+        // Get all active sales with outstanding amount (globally, not filtered by period)
+        $allActiveSales = Sale::with('payments')
+            ->whereNotIn('status', $canceledStatuses)
+            ->where('outstanding_amount', '>', 0)
+            ->get();
+
+        $totalActiveSalesForStatus = max(1, $allActiveSales->count());
+
+        // Count sales by billing status
+        $tunggakanCount = 0;
+        $perhatianCount = 0;
+        $amanCount = 0;
+
+        foreach ($allActiveSales as $sale) {
+            $hasOverdue = $sale->payments()
+                ->where('status', 'unpaid')
+                ->whereDate('due_date', '<', $today)
+                ->exists();
+
+            if ($hasOverdue) {
+                $tunggakanCount++;
+                continue;
+            }
+
+            $hasUpcoming = $sale->payments()
+                ->where('status', 'unpaid')
+                ->whereDate('due_date', '>=', $today)
+                ->whereDate('due_date', '<=', $sevenDaysFromNow)
+                ->exists();
+
+            if ($hasUpcoming) {
+                $perhatianCount++;
+            } else {
+                $amanCount++;
+            }
+        }
+
+        // Calculate percentages
+        $tunggakanPct = $tunggakanCount / $totalActiveSalesForStatus;
+        $perhatianPct = $perhatianCount / $totalActiveSalesForStatus;
+        $amanPct = $amanCount / $totalActiveSalesForStatus;
+
         $trendCalc = function ($current, $previous) {
             if ($previous === null) {
                 return null;
@@ -155,7 +202,7 @@ class DashboardController extends Controller
             ['label' => 'Total DP Diterima', 'value' => $totalDP, 'previous' => $previousTotals['dp'] ?? null, 'trend' => $compareEnabled ? $trendCalc($totalDP, $previousTotals['dp'] ?? null) : null, 'hint' => $totalPenjualan ? "dari {$totalPenjualan} penjualan" : 'Belum ada data',],
             ['label' => 'Total Penjualan', 'value' => $totalPenjualan, 'isUnit' => true, 'previous' => $previousTotals['count'] ?? null, 'trend' => $compareEnabled ? $trendCalc($totalPenjualan, $previousTotals['count'] ?? null) : null, 'hint' => 'senilai Rp ' . number_format($totalHarga, 0, ',', '.'),],
             ['label' => 'Total Penjualan Batal', 'value' => $canceledCount, 'isUnit' => true, 'previous' => null, 'trend' => null, 'hint' => $canceledCount ? 'senilai Rp ' . number_format($canceledValue, 0, ',', '.') : 'Tidak ada penjualan batal',],
-            ['label' => 'Total Piutang (Global)', 'value' => $outstanding, 'previous' => null, 'trend' => null, 'hint' => $globalActiveSalesCount > 0 ? "dari {$globalActiveSalesCount} penjualan aktif" : 'Belum ada data', 'statuses' => [['label' => 'Tunggakan', 'color' => 'var(--danger-500)', 'value' => $outstanding > 0 ? 0.3 : 0], ['label' => 'Perhatian', 'color' => 'var(--warning-400)', 'value' => $outstanding > 0 ? 0.3 : 0], ['label' => 'Aman', 'color' => 'var(--success-500)', 'value' => $outstanding > 0 ? 0.4 : 1],],],
+            ['label' => 'Total Piutang (Global)', 'value' => $outstanding, 'previous' => null, 'trend' => null, 'hint' => $globalActiveSalesCount > 0 ? "dari {$globalActiveSalesCount} penjualan aktif" : 'Belum ada data', 'statuses' => [['label' => 'Ada Tunggakan', 'color' => '#EF4444', 'value' => $tunggakanPct], ['label' => 'Jatuh Tempo <7 hari', 'color' => '#EAB308', 'value' => $perhatianPct], ['label' => 'Aman', 'color' => '#22C55E', 'value' => $amanPct],],],
             [
                 'label' => 'Nilai Persediaan Kavling',
                 'value' => $availableLots->sum('base_price'),
