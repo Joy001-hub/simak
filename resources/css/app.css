@@ -46,7 +46,7 @@ a {
 
 .app-shell {
     display: grid;
-    grid-template-columns: 280px 1fr;
+    grid-template-columns: 280px minmax(0, 1fr);
     min-height: 100vh;
     background: linear-gradient(145deg, #f9fbff 0%, #edf1f7 60%, #f9fbff 100%);
 }
@@ -808,7 +808,7 @@ canvas {
 
 /* Responsive */
 @media (max-width: 1200px) {
-    .app-shell { grid-template-columns: 240px 1fr; }
+    .app-shell { grid-template-columns: 240px minmax(0, 1fr); }
 }
 @media (max-width: 1260px) {
     .summary-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
@@ -816,7 +816,7 @@ canvas {
     .stat-value { font-size: clamp(15px, 2.2vw, 19px); }
 }
 @media (max-width: 960px) {
-    .app-shell { grid-template-columns: 220px 1fr; }
+    .app-shell { grid-template-columns: 220px minmax(0, 1fr); }
     .summary-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
     .panel-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 }

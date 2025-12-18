@@ -13,18 +13,25 @@
         .content-area {
             flex: 1;
             padding: 20px;
+            min-width: 0;
         }
 
         .content-area .page {
             width: 100%;
             max-width: 100%;
+            min-width: 0;
             margin: 0 auto;
             padding: 0;
         }
 
         .table-responsive {
             width: 100%;
+            max-width: 100%;
+            min-width: 0;
             overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-x: contain;
         }
 
         .table-clean th,
@@ -671,6 +678,29 @@
                 window.showMaintenanceModal?.();
             }
         });
+    </script>
+
+    <script>
+        // Enable horizontal scrolling for wide tables (trackpad / Shift+wheel).
+        (function () {
+            document.addEventListener('wheel', (e) => {
+                const container = e.target?.closest?.('.table-responsive');
+                if (!container) return;
+                if (container.scrollWidth <= container.clientWidth) return;
+
+                const absX = Math.abs(e.deltaX || 0);
+                const absY = Math.abs(e.deltaY || 0);
+                const isHorizontalGesture = absX > absY;
+                const shouldScrollX = isHorizontalGesture || e.shiftKey;
+                if (!shouldScrollX) return;
+
+                const delta = (e.shiftKey && absX === 0) ? (e.deltaY || 0) : (e.deltaX || 0);
+                if (!delta) return;
+
+                container.scrollLeft += delta;
+                e.preventDefault();
+            }, { passive: false });
+        })();
     </script>
 
     @stack('scripts')
