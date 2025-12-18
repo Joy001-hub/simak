@@ -207,11 +207,17 @@ class DashboardController extends Controller
                 'label' => 'Nilai Persediaan Kavling',
                 'value' => $availableLots->sum('base_price'),
                 'hint' => 'dari ' . $globalAvailableLotsCount . ' unit tersedia',
+                'totalUnits' => $globalAvailableLotsCount,
                 'inventories' => $projectAvailCounts->values()->map(function ($p, $index) use ($availableLots) {
                     $totalAvail = max($availableLots->count(), 1);
-                    $colors = ['#4e79a7', '#f28e2c', '#e15759', '#76b7b2', '#59a14f', '#edc949', '#af7aa1', '#ff9da7', '#9c755f', '#bab0ab'];
-                    return ['label' => $p->name, 'color' => $colors[$index % count($colors)], 'value' => $p->avail_count / $totalAvail,];
-                }),
+                    $colors = ['#3B82F6', '#F97316', '#8B5CF6', '#22C55E', '#EAB308', '#0EA5E9', '#EF4444', '#64748B'];
+                    return [
+                        'label' => $p->name,
+                        'color' => $colors[$index % count($colors)],
+                        'value' => $p->avail_count / $totalAvail,
+                        'units' => $p->avail_count,
+                    ];
+                })->filter(fn($item) => $item['units'] > 0)->values(),
             ],
         ];
         $formatLabel = function (string $key, string $interval) {

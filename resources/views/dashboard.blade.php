@@ -124,7 +124,8 @@
                     class="bg-card-bg p-5 rounded-lg border border-card-border flex flex-col shadow-card hover:border-slate-300 transition-colors {{ $isWideCard ? 'lg:col-span-2' : '' }}">
                     <div class="flex justify-between items-start mb-2">
                         <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wide leading-tight">
-                            {!! nl2br(e($card['label'])) !!}</p>
+                            {!! nl2br(e($card['label'])) !!}
+                        </p>
                         @if (!empty($card['trend']))
                             @php
                                 $dir = $card['trend']['direction'] ?? 'up';
@@ -134,7 +135,18 @@
                                 {{ $isUp ? 'trending_up' : 'trending_down' }}
                             </span>
                         @else
-                            <span class="material-symbols-outlined text-blue-500 text-sm">payments</span>
+                            @php
+                                $iconMap = [
+                                    'Penerimaan Periode Ini' => ['icon' => 'account_balance_wallet', 'color' => 'text-blue-500'],
+                                    'Total DP Diterima' => ['icon' => 'credit_card', 'color' => 'text-emerald-500'],
+                                    'Total Penjualan' => ['icon' => 'home', 'color' => 'text-violet-500'],
+                                    'Total Penjualan Batal' => ['icon' => 'cancel', 'color' => 'text-red-500'],
+                                    'Total Piutang (Global)' => ['icon' => 'receipt_long', 'color' => 'text-amber-500'],
+                                    'Nilai Persediaan Kavling' => ['icon' => 'landscape', 'color' => 'text-teal-500'],
+                                ];
+                                $iconData = $iconMap[$card['label']] ?? ['icon' => 'payments', 'color' => 'text-blue-500'];
+                            @endphp
+                            <span class="material-symbols-outlined {{ $iconData['color'] }} text-sm">{{ $iconData['icon'] }}</span>
                         @endif
                     </div>
 
@@ -145,7 +157,8 @@
                         @else
                             <span class="text-sm font-medium text-slate-500">IDR</span>
                             <h3 class="text-2xl font-bold text-text-main tracking-tight">
-                                {{ number_format($card['value'], 0, ',', '.') }}</h3>
+                                {{ number_format($card['value'], 0, ',', '.') }}
+                            </h3>
                         @endif
                     </div>
 
@@ -176,7 +189,7 @@
                         <div class="flex flex-wrap gap-2 mt-auto pt-3">
                             @foreach ($card['statuses'] as $status)
                                 @php
-                                    $displayLabel = match($status['label']) {
+                                    $displayLabel = match ($status['label']) {
                                         'Ada Tunggakan' => 'Tunggakan',
                                         'Jatuh Tempo <7 hari' => 'Perhatian',
                                         default => $status['label']
@@ -191,22 +204,46 @@
                         </div>
                     @endif
 
-                    {{-- Inventory Bars --}}
+                    {{-- Inventory Donut Chart --}}
                     @if (!empty($card['inventories']))
-                        <div class="mt-auto pt-3 flex flex-col gap-3">
-                            <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden flex">
-                                @foreach ($card['inventories'] as $inventory)
-                                    <div style="width: {{ $inventory['value'] * 100 }}%; background: {{ $inventory['color'] }};"></div>
+                        @php
+                            $inventories = collect($card['inventories']);
+                            $totalUnits = $card['totalUnits'] ?? $inventories->sum('units');
+                            $circumference = 2 * M_PI * 40; // radius = 40
+                            $currentOffset = 0;
+                            $largestProject = $inventories->sortByDesc('units')->first();
+                        @endphp
+                        <div class="mt-auto pt-3 flex items-center justify-center gap-6">
+                            {{-- Donut Chart --}}
+                            <div class="relative size-[100px] shrink-0">
+                                <svg class="size-full transform -rotate-90" viewBox="0 0 100 100">
+                                    @foreach ($inventories as $inventory)
+                                        @php
+                                            $dashLength = ($inventory['value'] ?? 0) * $circumference;
+                                            $dashGap = $circumference - $dashLength;
+                                            $offset = -$currentOffset;
+                                            $currentOffset += $dashLength;
+                                        @endphp
+                                        <circle cx="50" cy="50" r="40" fill="transparent" stroke="{{ $inventory['color'] }}"
+                                            stroke-width="12" stroke-dasharray="{{ $dashLength }} {{ $dashGap }}"
+                                            stroke-dashoffset="{{ $offset }}"></circle>
+                                    @endforeach
+                                </svg>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                    <span class="text-xl font-bold text-text-main leading-none">{{ $totalUnits }}</span>
+                                    <span class="text-[10px] text-slate-500 mt-0.5">unit</span>
+                                </div>
+                            </div>
+                            {{-- Legend --}}
+                            <div class="flex flex-col gap-1.5 text-[10px] text-slate-600 font-medium">
+                                @foreach ($inventories as $inventory)
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="size-2 rounded-full shrink-0"
+                                            style="background: {{ $inventory['color'] }};"></span>
+                                        <span>{{ $inventory['label'] }} ({{ $inventory['units'] ?? 0 }})</span>
+                                    </div>
                                 @endforeach
                             </div>
-                            @foreach ($card['inventories'] as $inventory)
-                                <div class="flex items-center justify-between text-xs font-medium text-slate-600">
-                                    <span class="flex items-center gap-1.5">
-                                        <span class="size-2 rounded-full" style="background: {{ $inventory['color'] }};"></span>
-                                        {{ $inventory['label'] }}
-                                    </span>
-                                </div>
-                            @endforeach
                         </div>
                     @endif
                 </div>
