@@ -21,7 +21,7 @@
                         @csrf
                         <button class="btn primary" type="submit"
                             onclick="return confirm('Muat ulang data contoh? Data yang ada akan diganti.');"
-                            style="padding:8px 12px;">Muat Ulang Data Contoh</button>
+                            style="padding:8px 12px; box-shadow:none;">Muat Ulang Data Contoh</button>
                     </form>
                     <form action="{{ route('data.reset') }}" method="POST">
                         @csrf
@@ -44,7 +44,8 @@
                     <p class="panel-sub" style="margin:4px 0 0;">Ekspor data ke file JSON atau pulihkan dari backup.</p>
                 </div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    <a class="btn primary" href="{{ route('data.backup') }}" style="padding:8px 12px;">Unduh Backup</a>
+                    <a class="btn primary" href="{{ route('data.backup') }}"
+                        style="padding:8px 12px; box-shadow:none;">Unduh Backup</a>
                 </div>
             </div>
             <form action="{{ route('data.restore') }}" method="POST" enctype="multipart/form-data"
