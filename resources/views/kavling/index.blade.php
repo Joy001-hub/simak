@@ -3,7 +3,7 @@
 @section('content')
     <div class="page-heading" style="align-items:center; gap:12px; flex-wrap:wrap;">
         <div>
-            <h1 class="heading-title">Kavling</h1>
+            <h2 class="text-xl font-bold text-text-main tracking-tight">Kavling</h2>
         </div>
         <div
             style="flex:1; min-width:260px; display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap;">

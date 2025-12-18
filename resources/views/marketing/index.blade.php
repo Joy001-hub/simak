@@ -3,7 +3,7 @@
 @section('content')
     <div class="page-heading" style="align-items:center;">
         <div>
-            <h1 class="heading-title">Tim Marketing</h1>
+            <h2 class="text-xl font-bold text-text-main tracking-tight">Tim Marketing</h2>
         </div>
         <a href="{{ route('marketing.create') }}" class="chip is-active"
             style="box-shadow: 0 10px 22px rgba(156, 15, 47, 0.28); display:flex; align-items:center; gap:8px;">

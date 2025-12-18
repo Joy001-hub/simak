@@ -3,7 +3,7 @@
 @section('content')
     <div class="page-heading" style="align-items:center; margin-bottom:6px;">
         <div>
-            <h1 class="heading-title">Profil Perusahaan</h1>
+            <h2 class="text-xl font-bold text-text-main tracking-tight">Profil Perusahaan</h2>
 
         </div>
     </div>

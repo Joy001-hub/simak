@@ -4,7 +4,7 @@
     <div class="page-heading" style="align-items:center;">
         <div>
 
-            <h1 class="heading-title">Manajemen Data</h1>
+            <h2 class="text-xl font-bold text-text-main tracking-tight">Manajemen Data</h2>
         </div>
     </div>
 

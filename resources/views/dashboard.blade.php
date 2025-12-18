@@ -68,7 +68,7 @@
         <header class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
                 <h2 class="text-xl font-bold text-text-main tracking-tight">Dashboard Overview</h2>
-                <p class="text-xs text-slate-500 font-normal mt-1">Welcome back, here's what's happening today.</p>
+                <p class="text-xs text-slate-500 font-normal mt-1">Selamat datang kembali, berikut adalah ringkasan data</p>
             </div>
             <div class="flex flex-wrap items-center gap-4">
                 <form method="GET" action="{{ route('dashboard') }}" class="flex flex-wrap items-center gap-2"
