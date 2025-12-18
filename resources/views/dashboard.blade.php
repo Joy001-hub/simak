@@ -11,8 +11,9 @@
             theme: {
                 extend: {
                     colors: {
-                        primary: "#8B5CF6",
-                        "primary-hover": "#7C3AED",
+                        primary: "#9c0f2f",
+                        "primary-hover": "#7a0c25",
+                        "primary-light": "#be1239",
                         "sidebar-bg": "#FFFFFF",
                         "main-bg": "#F8FAFC",
                         "card-bg": "#FFFFFF",
@@ -24,7 +25,7 @@
                         "chart-orange": "#F97316",
                         "chart-green": "#22C55E",
                         "chart-yellow": "#EAB308",
-                        "chart-purple": "#A855F7",
+                        "chart-purple": "#9c0f2f",
                         "status-risk": "#EF4444",
                         "status-warning": "#EAB308",
                         "status-safe": "#22C55E",
@@ -139,7 +140,7 @@
                                 $iconMap = [
                                     'Penerimaan Periode Ini' => ['icon' => 'account_balance_wallet', 'color' => 'text-blue-500'],
                                     'Total DP Diterima' => ['icon' => 'credit_card', 'color' => 'text-emerald-500'],
-                                    'Total Penjualan' => ['icon' => 'home', 'color' => 'text-violet-500'],
+                                    'Total Penjualan' => ['icon' => 'home', 'color' => 'text-primary'],
                                     'Total Penjualan Batal' => ['icon' => 'cancel', 'color' => 'text-red-500'],
                                     'Total Piutang (Global)' => ['icon' => 'receipt_long', 'color' => 'text-amber-500'],
                                     'Nilai Persediaan Kavling' => ['icon' => 'landscape', 'color' => 'text-teal-500'],
@@ -319,8 +320,8 @@
                             data-toggle="project-sales-mode" data-mode="unit">Unit</button>
                     </div>
                 </div>
-                <div class="flex-1 w-full flex justify-center">
-                    <canvas id="projectSalesChart" class="w-full h-full"></canvas>
+                <div class="flex-1 w-full flex items-center justify-center overflow-hidden">
+                    <canvas id="projectSalesChart" class="max-w-full max-h-[220px]"></canvas>
                 </div>
             </div>
 
@@ -336,8 +337,8 @@
                             data-toggle="inventory-mode" data-mode="unit">Unit</button>
                     </div>
                 </div>
-                <div class="flex-1 w-full flex justify-center">
-                    <canvas id="projectInventoryChart" class="w-full h-full"></canvas>
+                <div class="flex-1 w-full flex items-center justify-center overflow-hidden">
+                    <canvas id="projectInventoryChart" class="max-w-full max-h-[220px]"></canvas>
                 </div>
             </div>
         </div>
@@ -705,7 +706,7 @@
                         {
                             label: 'Nilai (Rp)',
                             data: salesValues,
-                            backgroundColor: '#8B5CF6',
+                            backgroundColor: '#9c0f2f',
                             borderRadius: 10,
                             maxBarThickness: 32
                         },
@@ -792,7 +793,7 @@
                 marketingChart.options.scales.y.suggestedMax = axisCfg.suggestedMax;
             };
 
-            const marketingColors = ['#EF4444', '#F97316', '#EAB308', '#22C55E', '#3B82F6', '#8B5CF6', '#EC4899', '#64748B'];
+            const marketingColors = ['#9c0f2f', '#E65100', '#F9A825', '#2E7D32', '#1565C0', '#6A1B9A', '#00838F', '#424242'];
             const marketingChart = new Chart(marketingCtx, {
                 type: 'bar',
                 data: {
@@ -843,7 +844,7 @@
                 return { labels, values };
             };
             let { labels: projectSalesLabels, values: projectSalesValues } = buildProjectSalesData();
-            const projectSalesColors = ['#3B82F6', '#F97316', '#8B5CF6', '#22C55E', '#EAB308', '#0EA5E9', '#EF4444', '#64748B'];
+            const projectSalesColors = ['#9c0f2f', '#E65100', '#1565C0', '#2E7D32', '#F9A825', '#00838F', '#C62828', '#424242'];
             const projectSalesChart = new Chart(projectSalesCtx, {
                 type: 'doughnut',
                 data: {
@@ -900,7 +901,7 @@
                 return { labels, values };
             };
             let { labels: inventoryLabels, values: inventoryValues } = buildInventoryData();
-            const inventoryColors = ['#EAB308', '#A855F7', '#3B82F6', '#22C55E', '#F97316', '#0EA5E9', '#EF4444', '#64748B'];
+            const inventoryColors = ['#9c0f2f', '#E65100', '#1565C0', '#2E7D32', '#F9A825', '#00838F', '#C62828', '#424242'];
             const projectInventoryChart = new Chart(projectInventoryCtx, {
                 type: 'doughnut',
                 data: {

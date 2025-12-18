@@ -210,7 +210,7 @@ class DashboardController extends Controller
                 'totalUnits' => $globalAvailableLotsCount,
                 'inventories' => $projectAvailCounts->values()->map(function ($p, $index) use ($availableLots) {
                     $totalAvail = max($availableLots->count(), 1);
-                    $colors = ['#3B82F6', '#F97316', '#8B5CF6', '#22C55E', '#EAB308', '#0EA5E9', '#EF4444', '#64748B'];
+                    $colors = ['#9c0f2f', '#E65100', '#1565C0', '#2E7D32', '#F9A825', '#00838F', '#C62828', '#424242'];
                     return [
                         'label' => $p->name,
                         'color' => $colors[$index % count($colors)],
