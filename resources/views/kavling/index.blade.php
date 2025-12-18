@@ -5,20 +5,25 @@
         <div>
             <h1 class="heading-title">Kavling</h1>
         </div>
-        <div style="flex:1; min-width:260px; display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap;">
+        <div
+            style="flex:1; min-width:260px; display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap;">
             <div style="position:relative; flex:1; min-width:220px; max-width:340px;">
                 <input id="lotSearch" type="text" placeholder="Cari kavling / project..." autocomplete="off"
                     style="width:100%; padding:10px 12px 10px 34px; border:1px solid #e5e7eb; border-radius:10px; font-size:14px; box-shadow:0 6px 18px rgba(17,24,39,0.04);">
-                <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#9ca3af; display:flex; align-items:center;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <span
+                    style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#9ca3af; display:flex; align-items:center;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="11" cy="11" r="7"></circle>
                         <line x1="16.65" y1="16.65" x2="21" y2="21"></line>
                     </svg>
                 </span>
-                <div id="lotSuggestions" style="display:none; position:absolute; z-index:10; left:0; right:0; background:#fff; border:1px solid #e5e7eb; border-radius:10px; margin-top:6px; box-shadow:0 10px 28px rgba(17,24,39,0.08); max-height:220px; overflow:auto;">
+                <div id="lotSuggestions"
+                    style="display:none; position:absolute; z-index:10; left:0; right:0; background:#fff; border:1px solid #e5e7eb; border-radius:10px; margin-top:6px; box-shadow:0 10px 28px rgba(17,24,39,0.08); max-height:220px; overflow:auto;">
                 </div>
             </div>
-            <a href="{{ route('kavling.create') }}" class="chip is-active" style="box-shadow: 0 10px 22px rgba(156, 15, 47, 0.28); display:flex; align-items:center; gap:8px; white-space:nowrap;">
+            <a href="{{ route('kavling.create') }}" class="chip is-active"
+                style="box-shadow: 0 10px 22px rgba(156, 15, 47, 0.28); display:flex; align-items:center; gap:8px; white-space:nowrap;">
                 <span style="font-size:18px; line-height:0.9;">+</span> Tambah Kavling
             </a>
         </div>
@@ -54,17 +59,21 @@
                         @endphp
                         <td><span class="status-chip {{ $statusClass }}">{{ $lot->status }}</span></td>
                         <td style="padding-left:14px; white-space: nowrap;">
-                            <a href="{{ route('kavling.edit', $lot) }}" class="btn" style="padding:8px 10px; border-color:#e5e7eb;">Edit</a>
+                            <a href="{{ route('kavling.edit', $lot) }}" class="btn"
+                                style="padding:8px 10px; border-color:#e5e7eb;">Edit</a>
                             <form action="{{ route('kavling.destroy', $lot) }}" method="POST" style="display:inline;">
                                 @csrf
                                 @method('DELETE')
-                                <button class="btn" style="padding:8px 10px; border-color:#e5e7eb; color:#b4232a; margin-left:6px;"
+                                <button class="btn"
+                                    style="padding:8px 10px; border-color:#e5e7eb; color:#b4232a; margin-left:6px;"
                                     onclick="return confirm('Hapus kavling ini?')">Delete</button>
                             </form>
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="7" style="text-align:center; padding:18px;">Belum ada data</td></tr>
+                    <tr>
+                        <td colspan="7" style="text-align:center; padding:18px;">Belum ada data</td>
+                    </tr>
                 @endforelse
             </tbody>
         </table>

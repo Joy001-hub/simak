@@ -5,12 +5,13 @@
         <div>
             <h1 class="heading-title">Tim Marketing</h1>
         </div>
-        <a href="{{ route('marketing.create') }}" class="chip is-active" style="box-shadow: 0 10px 22px rgba(156, 15, 47, 0.28); display:flex; align-items:center; gap:8px;">
+        <a href="{{ route('marketing.create') }}" class="chip is-active"
+            style="box-shadow: 0 10px 22px rgba(156, 15, 47, 0.28); display:flex; align-items:center; gap:8px;">
             <span style="font-size:18px; line-height:0.9;">+</span> Add Salesman
         </a>
     </div>
 
-    <div class="card" style="padding: 0; width: 100%; max-width: 960px;">
+    <div class="card" style="padding: 0; width: 100%;">
         <table class="table-clean" style="table-layout: fixed;">
             <thead>
                 <tr>
@@ -27,17 +28,21 @@
                         <td style="font-weight:700; color:#0f172a;">{{ $person->name }}</td>
                         <td style="white-space: nowrap;">{{ $person->phone }}</td>
                         <td style="padding-left:14px; white-space: nowrap;">
-                            <a href="{{ route('marketing.edit', $person) }}" class="btn" style="padding:8px 10px; border-color:#e5e7eb;">Edit</a>
+                            <a href="{{ route('marketing.edit', $person) }}" class="btn"
+                                style="padding:8px 10px; border-color:#e5e7eb;">Edit</a>
                             <form action="{{ route('marketing.destroy', $person) }}" method="POST" style="display:inline;">
                                 @csrf
                                 @method('DELETE')
-                                <button class="btn" style="padding:8px 10px; border-color:#e5e7eb; color:#b4232a; margin-left:6px;"
+                                <button class="btn"
+                                    style="padding:8px 10px; border-color:#e5e7eb; color:#b4232a; margin-left:6px;"
                                     onclick="return confirm('Hapus salesman ini?')">Delete</button>
                             </form>
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="4" style="text-align:center; padding:18px;">Belum ada data</td></tr>
+                    <tr>
+                        <td colspan="4" style="text-align:center; padding:18px;">Belum ada data</td>
+                    </tr>
                 @endforelse
             </tbody>
         </table>

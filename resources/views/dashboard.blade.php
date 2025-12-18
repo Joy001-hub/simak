@@ -844,7 +844,8 @@
                 return { labels, values };
             };
             let { labels: projectSalesLabels, values: projectSalesValues } = buildProjectSalesData();
-            const projectSalesColors = ['#9c0f2f', '#E65100', '#1565C0', '#2E7D32', '#F9A825', '#00838F', '#C62828', '#424242'];
+            const projectSalesColors = ['#1565C0', '#E65100', '#9c0f2f', '#2E7D32', '#F9A825', '#00838F', '#C62828', '#424242'];
+
             const projectSalesChart = new Chart(projectSalesCtx, {
                 type: 'doughnut',
                 data: {
@@ -854,7 +855,8 @@
                             label: projectSalesMode === 'unit' ? 'Jumlah Unit' : 'Nilai (Rp)',
                             data: projectSalesValues,
                             backgroundColor: projectSalesLabels.map((_, idx) => projectSalesColors[idx % projectSalesColors.length]),
-                            borderWidth: 1
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
                         }
                     ]
                 },
@@ -862,10 +864,39 @@
                     ...sharedOptions,
                     cutout: '55%',
                     plugins: {
-                        legend: { display: true, position: 'right' },
+                        legend: {
+                            display: true,
+                            position: 'right',
+                            labels: {
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                boxWidth: 8,
+                                boxHeight: 8,
+                                padding: 20,
+                                font: { size: 11 },
+                                generateLabels: function (chart) {
+                                    const data = chart.data;
+                                    const values = data.datasets[0].data;
+                                    const total = values.reduce((a, b) => a + b, 0);
+                                    return data.labels.map((label, i) => {
+                                        const pct = total > 0 ? ((values[i] / total) * 100).toFixed(0) : 0;
+                                        return {
+                                            text: `${label}    ${pct}%`,
+                                            fillStyle: data.datasets[0].backgroundColor[i],
+                                            strokeStyle: data.datasets[0].backgroundColor[i],
+                                            hidden: false,
+                                            index: i
+                                        };
+                                    });
+                                }
+                            }
+                        },
                         tooltip: {
                             callbacks: {
-                                label: ctx => `${ctx.label}: ${projectSalesMode === 'unit' ? unitTick(ctx.parsed) : formatRupiahFull(ctx.parsed)}`
+                                label: ctx => {
+                                    const valueStr = projectSalesMode === 'unit' ? unitTick(ctx.parsed) : formatRupiahFull(ctx.parsed);
+                                    return `${ctx.label}: ${valueStr}`;
+                                }
                             }
                         }
                     }
@@ -919,7 +950,33 @@
                     ...sharedOptions,
                     cutout: '55%',
                     plugins: {
-                        legend: { display: true, position: 'right' },
+                        legend: { 
+                            display: true, 
+                            position: 'right',
+                            labels: {
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                boxWidth: 8,
+                                boxHeight: 8,
+                                padding: 20,
+                                font: { size: 11 },
+                                generateLabels: function (chart) {
+                                    const data = chart.data;
+                                    const values = data.datasets[0].data;
+                                    const total = values.reduce((a, b) => a + b, 0);
+                                    return data.labels.map((label, i) => {
+                                        const pct = total > 0 ? ((values[i] / total) * 100).toFixed(0) : 0;
+                                        return {
+                                            text: `${label}    ${pct}%`,
+                                            fillStyle: data.datasets[0].backgroundColor[i],
+                                            strokeStyle: data.datasets[0].backgroundColor[i],
+                                            hidden: false,
+                                            index: i
+                                        };
+                                    });
+                                }
+                            }
+                        },
                         tooltip: {
                             callbacks: {
                                 label: ctx => `${ctx.label}: ${inventoryMode === 'unit' ? unitTick(ctx.parsed) : formatRupiahFull(ctx.parsed)}`

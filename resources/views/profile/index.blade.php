@@ -13,7 +13,7 @@
     <form id="companyForm" action="{{ route('profile.update') }}" method="POST" enctype="multipart/form-data">
         @csrf
         <div class="card"
-            style="max-width: 1100px; width: 100%; margin: 0 auto; gap: 18px; padding:22px; box-shadow:0 18px 36px rgba(17,24,39,0.06); border:1px solid #e5e7eb;">
+            style="width: 100%; gap: 18px; padding:22px; box-shadow:0 18px 36px rgba(17,24,39,0.06); border:1px solid #e5e7eb;">
             <h3 class="panel-title" style="padding:0 0 6px 0;">Informasi Dasar</h3>
             <div class="grid-2" style="column-gap:18px; row-gap:12px;">
                 <div class="field">

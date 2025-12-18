@@ -2,9 +2,8 @@
 
 @section('content')
     <div class="page-heading" style="align-items:center;">
-        <div>
-            <h1 class="heading-title">Penjualan</h1>
-        </div>
+        <h2 class="text-xl font-bold text-text-main tracking-tight">Penjualan</h2>
+
         <a href="{{ route('penjualan.create') }}" class="chip is-active"
             style="box-shadow: 0 10px 22px rgba(156, 15, 47, 0.28); display:flex; align-items:center; gap:8px;">
             <span style="font-size:18px; line-height:0.9;">+</span> Tambah Penjualan
@@ -87,7 +86,8 @@
                         <option value="Semua">Semua</option>
                         @foreach($marketers as $marketer)
                             <option value="{{ $marketer->id }}" @selected(($filters['marketing'] ?? 'Semua') == $marketer->id)>
-                                {{ $marketer->name }}</option>
+                                {{ $marketer->name }}
+                            </option>
                         @endforeach
                     </select>
                 </div>
@@ -243,21 +243,21 @@
                         statusColor = '#b45309';
                     }
                     return `<tr>
-                        <td style="text-align:center; white-space:nowrap;" title="${statusTagihan}">${icon}</td>
-                        <td style="font-weight:700; color:#0f172a; white-space:nowrap;">${item.kavling ?? '-'}</td>
-                        <td style="white-space:nowrap;">${item.pembeli ?? '-'}</td>
-                        <td style="white-space:nowrap;">${item.tgl_booking ?? '-'}</td>
-                        <td style="white-space:nowrap;">${item.metode_bayar ?? '-'}</td>
-                        <td style="white-space:nowrap;">Rp ${harga}</td>
-                        <td style="color:${outstandingRed}; font-weight:700; white-space:nowrap;">Rp ${sisa}</td>
-                        <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${dpBg}; color:${dpColor}; font-weight:700; white-space:nowrap;">${dpStatus}</span></td>
-                        <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${statusBg}; color:${statusColor}; font-weight:700; white-space:nowrap;">${saleStatus || '-'}</span></td>
-                        <td style="white-space:nowrap;">${item.estimasi_lunas ?? '-'}</td>
-                        <td style="white-space:nowrap;">${item.marketing ?? '-'}</td>
-                        <td style="padding-left:14px; white-space: nowrap;">
-                            <a href="/penjualan/${item.id}" class="btn light" style="padding:8px 10px; border-color:#e5e7eb;">Detail</a>
-                        </td>
-                    </tr>`;
+                            <td style="text-align:center; white-space:nowrap;" title="${statusTagihan}">${icon}</td>
+                            <td style="font-weight:700; color:#0f172a; white-space:nowrap;">${item.kavling ?? '-'}</td>
+                            <td style="white-space:nowrap;">${item.pembeli ?? '-'}</td>
+                            <td style="white-space:nowrap;">${item.tgl_booking ?? '-'}</td>
+                            <td style="white-space:nowrap;">${item.metode_bayar ?? '-'}</td>
+                            <td style="white-space:nowrap;">Rp ${harga}</td>
+                            <td style="color:${outstandingRed}; font-weight:700; white-space:nowrap;">Rp ${sisa}</td>
+                            <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${dpBg}; color:${dpColor}; font-weight:700; white-space:nowrap;">${dpStatus}</span></td>
+                            <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${statusBg}; color:${statusColor}; font-weight:700; white-space:nowrap;">${saleStatus || '-'}</span></td>
+                            <td style="white-space:nowrap;">${item.estimasi_lunas ?? '-'}</td>
+                            <td style="white-space:nowrap;">${item.marketing ?? '-'}</td>
+                            <td style="padding-left:14px; white-space: nowrap;">
+                                <a href="/penjualan/${item.id}" class="btn light" style="padding:8px 10px; border-color:#e5e7eb;">Detail</a>
+                            </td>
+                        </tr>`;
                 }).join('');
             };
 
