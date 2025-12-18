@@ -5,8 +5,7 @@
         <div>
             <h2 class="text-xl font-bold text-text-main tracking-tight">Tim Marketing</h2>
         </div>
-        <a href="{{ route('marketing.create') }}" class="chip is-active"
-            style="box-shadow: 0 10px 22px rgba(156, 15, 47, 0.28); display:flex; align-items:center; gap:8px;">
+        <a href="{{ route('marketing.create') }}" class="chip is-active" style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:18px; line-height:0.9;">+</span> Add Salesman
         </a>
     </div>

@@ -12,7 +12,7 @@
         <div class="card" style="gap:10px;">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
                 <div>
-                    <h3 class="panel-title" style="margin:0;">Data Contoh</h3>
+                    <h4 class="panel-title" style="margin:0;">Data Contoh</h4>
                     <p class="panel-sub" style="margin:4px 0 0;">Isi aplikasi dengan data contoh 3 tahun untuk
                         demo/pengujian atau kosongkan semua data agar kembali fresh.</p>
                 </div>
@@ -40,7 +40,7 @@
         <div class="card" style="gap:10px;">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
                 <div>
-                    <h3 class="panel-title" style="margin:0;">Backup & Restore</h3>
+                    <h5 class="panel-title" style="margin:0;">Backup & Restore</h5>
                     <p class="panel-sub" style="margin:4px 0 0;">Ekspor data ke file JSON atau pulihkan dari backup.</p>
                 </div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">

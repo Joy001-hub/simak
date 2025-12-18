@@ -4,8 +4,7 @@
     <div class="page-heading" style="align-items:center;">
         <h2 class="text-xl font-bold text-text-main tracking-tight">Penjualan</h2>
 
-        <a href="{{ route('penjualan.create') }}" class="chip is-active"
-            style="box-shadow: 0 10px 22px rgba(156, 15, 47, 0.28); display:flex; align-items:center; gap:8px;">
+        <a href="{{ route('penjualan.create') }}" class="chip is-active" style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:18px; line-height:0.9;">+</span> Tambah Penjualan
         </a>
     </div>
@@ -108,27 +107,55 @@
             <table class="table-clean" style="min-width:1100px;">
                 <thead>
                     <tr>
-                        <th style="width:40px; text-align:center;">Tagihan</th>
+                        <th style="width:40px; text-align:center;"></th>
                         <th style="width:220px;">Kavling</th>
                         <th style="width:160px;">Pembeli</th>
                         <th style="width:140px;">
                             <a href="{{ route('penjualan.index', array_merge(request()->query(), ['sort_by' => 'booking_date', 'sort_dir' => ($filters['sort_by'] === 'booking_date' && ($filters['sort_dir'] ?? 'desc') === 'asc') ? 'desc' : 'asc'])) }}"
-                                class="inline-flex items-center gap-1 text-gray-700">Tgl. Booking</a>
+                                class="inline-flex items-center gap-1 text-gray-700">
+                                Tgl. Booking
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#9ca3af;">
+                                    <path d="M7 15l5 5 5-5" />
+                                    <path d="M7 9l5-5 5 5" />
+                                </svg>
+                            </a>
                         </th>
                         <th style="width:140px;">Metode Bayar</th>
                         <th style="width:140px;">Harga Jual</th>
                         <th style="width:140px;">
                             <a href="{{ route('penjualan.index', array_merge(request()->query(), ['sort_by' => 'sisa_piutang', 'sort_dir' => ($filters['sort_by'] === 'sisa_piutang' && ($filters['sort_dir'] ?? 'desc') === 'asc') ? 'desc' : 'asc'])) }}"
-                                class="inline-flex items-center gap-1 text-gray-700">Sisa Piutang</a>
+                                class="inline-flex items-center gap-1 text-gray-700">
+                                Sisa Piutang
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#9ca3af;">
+                                    <path d="M7 15l5 5 5-5" />
+                                    <path d="M7 9l5-5 5 5" />
+                                </svg>
+                            </a>
                         </th>
                         <th style="width:120px;">Status DP</th>
                         <th style="width:120px;">
                             <a href="{{ route('penjualan.index', array_merge(request()->query(), ['sort_by' => 'status', 'sort_dir' => ($filters['sort_by'] === 'status' && ($filters['sort_dir'] ?? 'desc') === 'asc') ? 'desc' : 'asc'])) }}"
-                                class="inline-flex items-center gap-1 text-gray-700">Status</a>
+                                class="inline-flex items-center gap-1 text-gray-700">
+                                Status
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#9ca3af;">
+                                    <path d="M7 15l5 5 5-5" />
+                                    <path d="M7 9l5-5 5 5" />
+                                </svg>
+                            </a>
                         </th>
                         <th style="width:140px;">
                             <a href="{{ route('penjualan.index', array_merge(request()->query(), ['sort_by' => 'estimasi_lunas', 'sort_dir' => ($filters['sort_by'] === 'estimasi_lunas' && ($filters['sort_dir'] ?? 'desc') === 'asc') ? 'desc' : 'asc'])) }}"
-                                class="inline-flex items-center gap-1 text-gray-700">Estimasi Lunas</a>
+                                class="inline-flex items-center gap-1 text-gray-700">
+                                Estimasi Lunas
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#9ca3af;">
+                                    <path d="M7 15l5 5 5-5" />
+                                    <path d="M7 9l5-5 5 5" />
+                                </svg>
+                            </a>
                         </th>
                         <th style="width:140px;">Marketing</th>
                         <th style="text-align:left; width:120px; padding-left:14px;">Actions</th>
@@ -138,11 +165,11 @@
                     @forelse ($penjualan as $item)
                         @php
                             $statusTagihan = $item['status_tagihan'] ?? 'Aman';
-                            $icon = '✅';
+                            $icon = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block; vertical-align:middle;"><circle cx="12" cy="12" r="10" fill="#22c55e"/><path d="M7.5 12L10.5 15L16.5 9" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
                             if ($statusTagihan === 'Ada Tunggakan')
-                                $icon = '⚠️';
+                                $icon = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block; vertical-align:middle;"><circle cx="12" cy="12" r="10" fill="#ef4444"/><path d="M12 7V13" stroke="white" stroke-width="2.5" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1.5" fill="white"/></svg>';
                             if ($statusTagihan === 'Jatuh Tempo < 7 Hari')
-                                $icon = '⏰';
+                                $icon = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block; vertical-align:middle;"><circle cx="12" cy="12" r="10" fill="#f59e0b"/><path d="M12 7V12L15 15" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
                             $dpStatus = $item['status_dp'] ?? 'Belum';
                             $dpColor = $dpStatus === 'Lunas' ? '#16a34a' : '#6b7280';
                             $dpBg = $dpStatus === 'Lunas' ? 'rgba(22,163,74,0.12)' : 'rgba(107,114,128,0.12)';
@@ -151,7 +178,7 @@
                             $statusColor = $saleStatus === 'Paid Off' ? '#0f9d58' : ($saleStatus === 'Active' ? '#2563eb' : '#6b7280');
                         @endphp
                         <tr>
-                            <td style="text-align:center; white-space:nowrap;" title="{{ $statusTagihan }}">{{ $icon }}</td>
+                            <td style="text-align:center; white-space:nowrap;" title="{{ $statusTagihan }}">{!! $icon !!}</td>
                             <td style="font-weight:700; color:#0f172a; white-space:nowrap;">{{ $item['kavling'] }}</td>
                             <td style="white-space:nowrap;">{{ $item['pembeli'] }}</td>
                             <td style="white-space:nowrap;">{{ $item['tgl_booking'] }}</td>
@@ -170,7 +197,7 @@
                             <td>
                                 <span
                                     style="display:inline-block; padding:4px 10px; border-radius:999px; background:{{ $statusBg }}; color:{{ $statusColor }}; font-weight:700; white-space:nowrap;">
-                                    {{ $saleStatus ?: '-' }}
+                                    {{ $saleStatus === 'Paid Off' ? '🤝 ' : '' }}{{ $saleStatus ?: '-' }}
                                 </span>
                             </td>
                             <td style="white-space:nowrap;">{{ $item['estimasi_lunas'] ?? '-' }}</td>
@@ -219,9 +246,9 @@
                     const harga = Number(item.harga_jual || 0).toLocaleString('id-ID');
                     const sisa = Number(item.sisa_piutang || 0).toLocaleString('id-ID');
                     const statusTagihan = item.status_tagihan || 'Aman';
-                    let icon = '✅';
-                    if (statusTagihan === 'Ada Tunggakan') icon = '⚠️';
-                    if (statusTagihan === 'Jatuh Tempo < 7 Hari') icon = '⏰';
+                    let icon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block; vertical-align:middle;"><circle cx="12" cy="12" r="10" fill="#22c55e"/><path d="M7.5 12L10.5 15L16.5 9" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+                    if (statusTagihan === 'Ada Tunggakan') icon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block; vertical-align:middle;"><circle cx="12" cy="12" r="10" fill="#ef4444"/><path d="M12 7V13" stroke="white" stroke-width="2.5" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1.5" fill="white"/></svg>`;
+                    if (statusTagihan === 'Jatuh Tempo < 7 Hari') icon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block; vertical-align:middle;"><circle cx="12" cy="12" r="10" fill="#f59e0b"/><path d="M12 7V12L15 15" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
                     const dpStatus = item.status_dp || 'Belum';
                     const dpBg = dpStatus === 'Lunas' ? 'rgba(22,163,74,0.12)' : 'rgba(107,114,128,0.12)';
                     const dpColor = dpStatus === 'Lunas' ? '#16a34a' : '#6b7280';
@@ -243,21 +270,21 @@
                         statusColor = '#b45309';
                     }
                     return `<tr>
-                            <td style="text-align:center; white-space:nowrap;" title="${statusTagihan}">${icon}</td>
-                            <td style="font-weight:700; color:#0f172a; white-space:nowrap;">${item.kavling ?? '-'}</td>
-                            <td style="white-space:nowrap;">${item.pembeli ?? '-'}</td>
-                            <td style="white-space:nowrap;">${item.tgl_booking ?? '-'}</td>
-                            <td style="white-space:nowrap;">${item.metode_bayar ?? '-'}</td>
-                            <td style="white-space:nowrap;">Rp ${harga}</td>
-                            <td style="color:${outstandingRed}; font-weight:700; white-space:nowrap;">Rp ${sisa}</td>
-                            <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${dpBg}; color:${dpColor}; font-weight:700; white-space:nowrap;">${dpStatus}</span></td>
-                            <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${statusBg}; color:${statusColor}; font-weight:700; white-space:nowrap;">${saleStatus || '-'}</span></td>
-                            <td style="white-space:nowrap;">${item.estimasi_lunas ?? '-'}</td>
-                            <td style="white-space:nowrap;">${item.marketing ?? '-'}</td>
-                            <td style="padding-left:14px; white-space: nowrap;">
-                                <a href="/penjualan/${item.id}" class="btn light" style="padding:8px 10px; border-color:#e5e7eb;">Detail</a>
-                            </td>
-                        </tr>`;
+                                                <td style="text-align:center; white-space:nowrap;" title="${statusTagihan}">${icon}</td>
+                                                <td style="font-weight:700; color:#0f172a; white-space:nowrap;">${item.kavling ?? '-'}</td>
+                                                <td style="white-space:nowrap;">${item.pembeli ?? '-'}</td>
+                                                <td style="white-space:nowrap;">${item.tgl_booking ?? '-'}</td>
+                                                <td style="white-space:nowrap;">${item.metode_bayar ?? '-'}</td>
+                                                <td style="white-space:nowrap;">Rp ${harga}</td>
+                                                <td style="color:${outstandingRed}; font-weight:700; white-space:nowrap;">Rp ${sisa}</td>
+                                                <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${dpBg}; color:${dpColor}; font-weight:700; white-space:nowrap;">${dpStatus}</span></td>
+                                                <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${statusBg}; color:${statusColor}; font-weight:700; white-space:nowrap;">${saleStatus === 'Paid Off' ? '🤝 ' : ''}${saleStatus || '-'}</span></td>
+                                                <td style="white-space:nowrap;">${item.estimasi_lunas ?? '-'}</td>
+                                                <td style="white-space:nowrap;">${item.marketing ?? '-'}</td>
+                                                <td style="padding-left:14px; white-space: nowrap;">
+                                                    <a href="/penjualan/${item.id}" class="btn light" style="padding:8px 10px; border-color:#e5e7eb;">Detail</a>
+                                                </td>
+                                            </tr>`;
                 }).join('');
             };
 

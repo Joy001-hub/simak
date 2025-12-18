@@ -127,7 +127,14 @@ class DashboardController extends Controller
         } elseif (($periodLengthMonths ?? 0) >= 12) {
             $projectionMode = 'year';
         }
-        $projectionMeta = ['mode' => $projectionMode, 'aiEligible' => in_array($projectionMode, ['year', 'all']), 'rangeMonths' => $periodLengthMonths, 'dataMonths' => $dataRangeMonths, 'horizonMonths' => 12, 'horizonQuarters' => 4,];
+        $projectionMeta = [
+            'mode' => $projectionMode,
+            'aiEligible' => in_array($projectionMode, ['year', 'all']) && $dataRangeMonths >= 12,
+            'rangeMonths' => $periodLengthMonths,
+            'dataMonths' => $dataRangeMonths,
+            'horizonMonths' => 12,
+            'horizonQuarters' => 4,
+        ];
         $comparisonMeta = ['enabled' => $compareEnabled, 'label' => $compareLabel, 'range' => $compareEnabled ? [$compareFrom?->toDateString(), $compareTo?->toDateString()] : null, 'reason' => $canCompare ? null : 'Periode tidak bisa dibandingkan',];
         $canceledStatuses = ['canceled', Sale::STATUS_CANCELED_HAPUS, Sale::STATUS_CANCELED_REFUND, Sale::STATUS_CANCELED_OPER_KREDIT,];
         $activeSales = $sales->whereNotIn('status', $canceledStatuses);

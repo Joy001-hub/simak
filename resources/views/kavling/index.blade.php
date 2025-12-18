@@ -23,7 +23,7 @@
                 </div>
             </div>
             <a href="{{ route('kavling.create') }}" class="chip is-active"
-                style="box-shadow: 0 10px 22px rgba(156, 15, 47, 0.28); display:flex; align-items:center; gap:8px; white-space:nowrap;">
+                style="display:flex; align-items:center; gap:8px; white-space:nowrap;">
                 <span style="font-size:18px; line-height:0.9;">+</span> Tambah Kavling
             </a>
         </div>
@@ -50,7 +50,7 @@
                     @endphp
                     <tr data-lot-row data-label="{{ Str::lower($label) }}">
                         <td>{{ $index + 1 }}</td>
-                        <td>{{ $projectName }}</td>
+                        <td style="font-weight:700; color:#0f172a;">{{ $projectName }}</td>
                         <td>{{ $lot->block_number }}</td>
                         <td>{{ $lot->area }}</td>
                         <td>Rp {{ number_format($lot->base_price, 0, ',', '.') }}</td>

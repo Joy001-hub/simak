@@ -274,7 +274,7 @@
                                 data-toggle="sales-mode" data-mode="unit">Unit</button>
                         </div>
                         <label class="toggle flex items-center gap-2 cursor-pointer">
-                            <input id="projectionToggle" type="checkbox" checked
+                            <input id="projectionToggle" type="checkbox"
                                 class="rounded text-primary focus:ring-primary size-3.5">
                             <span class="text-[10px] text-slate-600">Proyeksi AI</span>
                         </label>
@@ -380,7 +380,7 @@
             const compareToggle = document.getElementById('compareToggle');
             const projectionContainer = projectionToggle?.closest('label');
 
-            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
             const maxValue = (...arrays) => {
                 const numbers = arrays.flat().filter(v => Number.isFinite(v));
                 return numbers.length ? Math.max(...numbers) : 1;
@@ -512,7 +512,7 @@
                     ? (meta.horizonQuarters || 4)
                     : mode === 'year'
                         ? (meta.horizonMonths || 12)
-                        : 12; // default 12 bulan supaya zigzag cukup panjang
+                        : 12;
 
                 const clean = values.filter(v => Number.isFinite(v));
                 const hasHistory = clean.length >= 3;
@@ -598,7 +598,10 @@
                     return new Date();
                 })();
                 projection.futureLabels.forEach((label, idx) => {
-                    pushEntry(`future-${idx}`, label, addStep(lastPeriodDate, idx + 1), idx);
+                    // Only add future labels to timeline if projection is enabled
+                    if (projectionToggle && projectionToggle.checked) {
+                        pushEntry(`future-${idx}`, label, addStep(lastPeriodDate, idx + 1), idx);
+                    }
                 });
                 const unique = new Map();
                 timeline.forEach(entry => {
@@ -744,10 +747,18 @@
                 },
                 options: {
                     ...sharedOptions,
+                    layout: { padding: { right: 25, left: 10, bottom: 25 } },
                     scales: {
                         x: {
-                            grid: { display: false },
-                            ticks: { color: '#64748B' }
+                            grid: { drawOnChartArea: false, drawTicks: true },
+                            ticks: {
+                                color: '#64748B',
+                                maxRotation: 45,
+                                minRotation: 45,
+                                autoSkip: false,
+                                maxTicksLimit: 36,
+                                font: { size: 10 }
+                            }
                         },
                         y: {
                             grid: { color: '#E2E8F0' },
@@ -950,8 +961,8 @@
                     ...sharedOptions,
                     cutout: '55%',
                     plugins: {
-                        legend: { 
-                            display: true, 
+                        legend: {
+                            display: true,
                             position: 'right',
                             labels: {
                                 usePointStyle: true,
@@ -1008,10 +1019,6 @@
 
             const syncProjectionToggle = () => {
                 if (!projectionToggle) return;
-                const hasProjection = projected.some(v => Number.isFinite(v));
-                if (!hasProjection) {
-                    projectionToggle.checked = false;
-                }
                 const projectionIndex = salesChart.data.datasets.findIndex(ds => ds.id === 'projection');
                 if (projectionIndex >= 0) {
                     const meta = salesChart.getDatasetMeta(projectionIndex);
@@ -1019,11 +1026,64 @@
                 }
             };
 
-            if (projectionToggle && projectionMeta && !projectionMeta.aiEligible) {
-                projectionToggle.title = 'Diperlukan data penjualan selama periode >1 tahun';
-            }
+            const updateProjectionTooltip = () => {
+                if (!projectionToggle || !projectionContainer) return;
 
+                // Reset state first
+                projectionToggle.disabled = false;
+                projectionContainer.removeAttribute('title');
+                projectionContainer.style.opacity = '1';
+                projectionContainer.style.cursor = 'pointer';
+
+                // Condition 1: Period Check - Strict "Tahun Ini" only
+                if (activePeriod !== 'Tahun Ini') {
+                    projectionToggle.disabled = true;
+                    projectionContainer.title = "Fitur ini hanya berfungsi di periode Tahun Ini";
+                    projectionContainer.style.opacity = '0.5';
+                    projectionContainer.style.cursor = 'not-allowed';
+                    if (projectionToggle.checked) {
+                        projectionToggle.checked = false;
+                        projectionToggle.dispatchEvent(new Event('change'));
+                    }
+                    return;
+                }
+
+                // Condition 2: Data Eligibility Check
+                if (projectionMeta && !projectionMeta.aiEligible) {
+                    projectionToggle.disabled = true;
+                    projectionContainer.title = "Diperlukan data setahun untuk mengaktifkan fitur ini";
+                    projectionContainer.style.opacity = '0.5';
+                    projectionContainer.style.cursor = 'not-allowed';
+                    if (projectionToggle.checked) {
+                        projectionToggle.checked = false;
+                        projectionToggle.dispatchEvent(new Event('change'));
+                    }
+                }
+            };
+
+            // Run initial check
+            updateProjectionTooltip();
             projectionToggle?.addEventListener('change', () => {
+                const rebuilt = buildSalesData();
+                salesLabels = rebuilt.labels;
+                salesValues = rebuilt.values;
+                projected = rebuilt.projected;
+                projectionLabel = rebuilt.projectionLabel;
+
+                salesChart.data.labels = salesLabels;
+                salesChart.data.datasets[0].data = salesValues;
+                const projectionIndex = salesChart.data.datasets.findIndex(ds => ds.id === 'projection');
+
+                if (projectionIndex >= 0) {
+                    salesChart.data.datasets[projectionIndex].data = projected;
+                    salesChart.data.datasets[projectionIndex].label = projectionLabel;
+                }
+
+                const axisCfg = buildAxisConfig(maxValue(salesValues, projected), salesMode === 'unit');
+                salesChart.options.scales.y.ticks.callback = axisCfg.callback;
+                salesChart.options.scales.y.ticks.stepSize = axisCfg.stepSize;
+                salesChart.options.scales.y.suggestedMax = axisCfg.suggestedMax;
+
                 syncProjectionToggle();
                 salesChart.update();
             });
