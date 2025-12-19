@@ -73,6 +73,13 @@ select,
     pointer-events: auto !important;
 }
 
+input[type="checkbox"],
+input[type="radio"],
+input[type="range"],
+.toggle input {
+    cursor: pointer !important;
+}
+
 button,
 .btn {
     -webkit-app-region: no-drag !important;

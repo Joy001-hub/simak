@@ -832,13 +832,36 @@
                 return `${el.tagName.toLowerCase()}${id}${classes}`;
             };
 
+            const cursorForElement = (el) => {
+                if (el instanceof HTMLInputElement) {
+                    const type = (el.type || '').toLowerCase();
+                    const pointerTypes = new Set([
+                        'checkbox',
+                        'radio',
+                        'range',
+                        'button',
+                        'submit',
+                        'reset',
+                        'color',
+                        'file',
+                        'image',
+                    ]);
+                    return pointerTypes.has(type) ? 'pointer' : 'text';
+                }
+                if (el instanceof HTMLSelectElement) {
+                    return 'pointer';
+                }
+                return 'text';
+            };
+
             const forceNoDrag = (el) => {
                 if (!el || !(el instanceof Element)) return;
+                const cursor = cursorForElement(el);
                 el.classList?.add('no-drag');
                 el.style.setProperty('-webkit-app-region', 'no-drag', 'important');
-                el.style.setProperty('user-select', 'text', 'important');
+                el.style.setProperty('user-select', cursor === 'text' ? 'text' : 'none', 'important');
                 el.style.setProperty('pointer-events', 'auto', 'important');
-                el.style.setProperty('cursor', 'text', 'important');
+                el.style.setProperty('cursor', cursor, 'important');
             };
 
             const forceNoDragAncestors = (el) => {
