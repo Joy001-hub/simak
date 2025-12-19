@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ config('app.name') }} | Dashboard</title>
     <meta name="turbo-cache-control" content="no-cache">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet" />
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%239c0f2f'/%3E%3Cpath d='M18 20h28v8H34v16H18V20Zm14 8h14v16H32V28Z' fill='%23fff'/%3E%3C/svg%3E">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -59,12 +61,33 @@
 
             <nav class="nav">
                 <a class="nav-item {{ request()->routeIs('dashboard') ? 'active' : '' }}"
-                    href="{{ route('dashboard') }}">
+                    href="{{ route('dashboard') }}" style="position: relative;">
                     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
                         <path
                             d="M4 11.5 12 4l8 7.5V20a1 1 0 0 1-1 1h-4.5a.5.5 0 0 1-.5-.5v-4a1 1 0 0 0-1-1h-3a1 1 0 0 0-1 1v4a.5.5 0 0 1-.5.5H5a1 1 0 0 1-1-1v-8.5Z" />
                     </svg>
                     <span class="label">Dashboard</span>
+                    @php $dashboardUpdates = session('dashboard_updates', 0); @endphp
+                    @if($dashboardUpdates > 0)
+                        <span style="
+                                                position: absolute;
+                                                right: 12px;
+                                                top: 50%;
+                                                transform: translateY(-50%);
+                                                background: #ef4444;
+                                                color: white;
+                                                font-size: 11px;
+                                                font-weight: 700;
+                                                min-width: 20px;
+                                                height: 20px;
+                                                border-radius: 10px;
+                                                display: inline-flex;
+                                                align-items: center;
+                                                justify-content: center;
+                                                padding: 0 6px;
+                                                box-shadow: 0 2px 4px rgba(239,68,68,0.4);
+                                            ">{{ $dashboardUpdates > 99 ? '99+' : $dashboardUpdates }}</span>
+                    @endif
                 </a>
                 <a class="nav-item {{ request()->routeIs('penjualan.*') ? 'active' : '' }}"
                     href="{{ route('penjualan.index') }}">
@@ -139,7 +162,7 @@
                         @endphp
 
                         <img class="company-logo-img" src="{{ $nativeUrl }}" alt="Logo perusahaan"
-                            onerror="this.onerror=null;this.src='{{ asset('/logo-app.png') }}';">
+                            onerror="this.onerror=null;this.src='{{ asset('logo-profile.png') }}';">
                     </div>
                     <div style="display:flex; flex-direction:column; gap:2px; overflow:hidden;">
                         <div class="brand-sub"
@@ -168,20 +191,88 @@
         <div class="content-area">
             <main class="page" style="padding-bottom: 80px;">
                 @if($errors->any())
-                    <div class="card"
-                        style="border-left:4px solid #ef4444; padding:16px; background:#fef2f2; color:#991b1b; max-width: 1100px; margin: 0 auto 24px auto; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-                        <div style="font-weight: 700; margin-bottom: 8px;">Terdapat kesalahan pada input:</div>
-                        <ul style="margin:0; padding-left:20px;">
+                    <div id="errorToast" style="
+                                                position: fixed;
+                                                top: 24px;
+                                                right: 24px;
+                                                z-index: 9999;
+                                                min-width: 320px;
+                                                max-width: 420px;
+                                                background: linear-gradient(135deg, #fff 0%, #fef2f2 100%);
+                                                border-radius: 12px;
+                                                box-shadow: 0 20px 40px rgba(0,0,0,0.15), 0 8px 16px rgba(239,68,68,0.1);
+                                                border: 1px solid rgba(239,68,68,0.2);
+                                                overflow: hidden;
+                                                animation: slideIn 0.4s ease-out;
+                                            ">
+                        <div style="
+                                                    display: flex;
+                                                    align-items: center;
+                                                    gap: 12px;
+                                                    padding: 16px 20px;
+                                                    background: linear-gradient(90deg, #ef4444, #dc2626);
+                                                    color: white;
+                                                ">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.5">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="12" y1="8" x2="12" y2="12" />
+                                <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                            <span style="font-weight: 600; font-size: 14px;">Terdapat kesalahan pada input</span>
+                            <button onclick="document.getElementById('errorToast').style.display='none'" style="
+                                                        margin-left: auto;
+                                                        background: rgba(255,255,255,0.2);
+                                                        border: none;
+                                                        border-radius: 6px;
+                                                        width: 28px;
+                                                        height: 28px;
+                                                        cursor: pointer;
+                                                        display: flex;
+                                                        align-items: center;
+                                                        justify-content: center;
+                                                        transition: background 0.2s;
+                                                    " onmouseover="this.style.background='rgba(255,255,255,0.3)'"
+                                onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white"
+                                    stroke-width="2.5">
+                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                            </button>
+                        </div>
+                        <ul style="
+                                                    margin: 0;
+                                                    padding: 16px 20px 16px 36px;
+                                                    color: #991b1b;
+                                                    font-size: 13px;
+                                                    line-height: 1.6;
+                                                ">
                             @foreach($errors->all() as $error)
-                                <li>{{ $error }}</li>
+                                <li style="margin-bottom: 4px;">{{ $error }}</li>
                             @endforeach
                         </ul>
                     </div>
+                    <style>
+                        @keyframes slideIn {
+                            from {
+                                transform: translateX(100%);
+                                opacity: 0;
+                            }
+
+                            to {
+                                transform: translateX(0);
+                                opacity: 1;
+                            }
+                        }
+                    </style>
                 @endif
                 @yield('content')
             </main>
-            <footer style="position: fixed; bottom: 0; left: 280px; right: 0; z-index: 20; background: rgba(249, 251, 255, 0.95); border-top: 1px solid #e2e8f0;">
-                <div style="width: 100%; max-width: 1500px; margin: 0 auto; padding: 20px 28px; text-align: center; font-size: 12px; color: #94a3b8; font-weight: 500;">
+            <footer
+                style="position: fixed; bottom: 0; left: 280px; right: 0; z-index: 20; background: rgba(249, 251, 255, 0.95); border-top: 1px solid #e2e8f0;">
+                <div
+                    style="width: 100%; max-width: 1500px; margin: 0 auto; padding: 20px 28px; text-align: center; font-size: 12px; color: #94a3b8; font-weight: 500;">
                     SIMAK™ &copy; 2025. All rights reserved.
                 </div>
             </footer>
@@ -274,8 +365,8 @@
     <style>
         .bell-floating {
             position: fixed;
-            bottom: 18px;
-            right: 18px;
+            bottom: 90px;
+            right: 24px;
             z-index: 50;
         }
 
@@ -570,13 +661,33 @@
             const bellButton = document.getElementById('bellButton');
             const bellPanel = document.getElementById('bellPanel');
             const bellClose = document.getElementById('bellClose');
+
+            const showBellButton = () => {
+                if (bellButton) bellButton.style.display = '';
+            };
+            const hideBellButton = () => {
+                if (bellButton) bellButton.style.display = 'none';
+            };
+
             const toggleBell = () => {
                 if (!bellPanel || ({{ $overdueCount ?? 0 }} === 0)) return;
+                const isOpening = !bellPanel.classList.contains('active');
                 bellPanel.classList.toggle('active');
+                if (isOpening) {
+                    hideBellButton();
+                } else {
+                    showBellButton();
+                }
             };
+
+            const closeBellPanel = () => {
+                bellPanel?.classList.remove('active');
+                showBellButton();
+            };
+
             bellButton?.addEventListener('click', toggleBell);
-            bellClose?.addEventListener('click', () => bellPanel?.classList.remove('active'));
-            bellPanel?.addEventListener('click', (e) => { if (e.target === bellPanel) bellPanel.classList.remove('active'); });
+            bellClose?.addEventListener('click', closeBellPanel);
+            bellPanel?.addEventListener('click', (e) => { if (e.target === bellPanel) closeBellPanel(); });
         })();
 
         // Logout button on sidebar - redirects to login page
@@ -700,6 +811,363 @@
                 container.scrollLeft += delta;
                 e.preventDefault();
             }, { passive: false });
+        })();
+    </script>
+
+    {{-- NativePHP Focus Doctor: aggressive input focus recovery --}}
+    <script>
+        (function () {
+            const logPrefix = '[FocusDoctor]';
+            const editableSelector = 'input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="textbox"]';
+            let lastEditable = null;
+            let needsRescue = false;
+            let lastResetAt = 0;
+            let lastNativeFocusAt = 0;
+            let lastWebContentsFocusAt = 0;
+
+            const describeElement = (el) => {
+                if (!el || !(el instanceof Element)) return null;
+                const id = el.id ? `#${el.id}` : '';
+                const classes = el.classList && el.classList.length ? `.${Array.from(el.classList).join('.')}` : '';
+                return `${el.tagName.toLowerCase()}${id}${classes}`;
+            };
+
+            const forceNoDrag = (el) => {
+                if (!el || !(el instanceof Element)) return;
+                el.classList?.add('no-drag');
+                el.style.setProperty('-webkit-app-region', 'no-drag', 'important');
+                el.style.setProperty('user-select', 'text', 'important');
+                el.style.setProperty('pointer-events', 'auto', 'important');
+                el.style.setProperty('cursor', 'text', 'important');
+            };
+
+            const forceNoDragAncestors = (el) => {
+                let node = el?.parentElement;
+                while (node && node !== document.body) {
+                    node.style.setProperty('-webkit-app-region', 'no-drag', 'important');
+                    node = node.parentElement;
+                }
+                if (document.body) {
+                    document.body.style.setProperty('-webkit-app-region', 'no-drag', 'important');
+                }
+            };
+
+            const focusWebContents = (reason) => {
+                const remote = window.remote;
+                if (!remote?.getCurrentWebContents) return;
+                const wc = remote.getCurrentWebContents();
+                if (!wc) return;
+                const now = Date.now();
+                if (now - lastWebContentsFocusAt < 200) return;
+                lastWebContentsFocusAt = now;
+                try {
+                    wc.focus();
+                    console.log(`${logPrefix} webContents focus`, reason || '', {
+                        hasFocus: document.hasFocus(),
+                        wcFocused: wc.isFocused?.(),
+                    });
+                } catch (err) {
+                    console.warn(`${logPrefix} webContents focus failed`, err);
+                }
+            };
+
+            const focusNativeWindow = (reason) => {
+                const remote = window.remote;
+                if (!remote?.getCurrentWindow) return;
+                const win = remote.getCurrentWindow();
+                if (!win) return;
+                const now = Date.now();
+                if (now - lastNativeFocusAt < 250) return;
+                lastNativeFocusAt = now;
+                try {
+                    if (remote.app?.focus) {
+                        try {
+                            remote.app.focus({ steal: true });
+                        } catch (err) {
+                            // Ignore app focus failures.
+                        }
+                    }
+                    if (win.setFocusable) {
+                        win.setFocusable(true);
+                    }
+                    if (win.isMinimized?.()) {
+                        win.restore();
+                    }
+                    if (win.isVisible && !win.isVisible()) {
+                        win.show();
+                    }
+                    win.focus();
+                    setTimeout(() => {
+                        if (!win.isFocused?.()) {
+                            if (win.setAlwaysOnTop) {
+                                win.setAlwaysOnTop(true);
+                                setTimeout(() => win.setAlwaysOnTop(false), 200);
+                            }
+                            win.focus();
+                        }
+                    }, 60);
+                    setTimeout(() => focusWebContents('native-window-focus'), 0);
+                    console.log(`${logPrefix} native window focus`, reason || '', {
+                        hasFocus: document.hasFocus(),
+                        winFocused: win.isFocused?.(),
+                    });
+                } catch (err) {
+                    console.warn(`${logPrefix} native focus failed`, err);
+                }
+            };
+
+            const scanDragRegions = (reason) => {
+                const hits = [];
+                const all = document.querySelectorAll('body *');
+                all.forEach((el) => {
+                    const style = window.getComputedStyle(el);
+                    const region = style.getPropertyValue('-webkit-app-region');
+                    if (region === 'drag') {
+                        hits.push(describeElement(el));
+                    }
+                });
+                if (hits.length) {
+                    console.warn(`${logPrefix} drag regions`, reason, hits);
+                }
+            };
+
+            const resetWindowFocus = (reason) => {
+                const now = Date.now();
+                if (now - lastResetAt < 250) return;
+                lastResetAt = now;
+                if (!document.hasFocus()) {
+                    focusNativeWindow(reason || 'reset');
+                    try {
+                        window.focus();
+                    } catch (err) {
+                        // Ignore focus failures.
+                    }
+                }
+                if (!document.hasFocus()) {
+                    focusWebContents(reason || 'reset');
+                }
+                console.log(`${logPrefix} focus reset`, reason || '', { hasFocus: document.hasFocus() });
+            };
+
+            const focusSandbox = () => {
+                if (!document.body) return;
+                const dummy = document.createElement('input');
+                dummy.type = 'text';
+                dummy.setAttribute('aria-hidden', 'true');
+                dummy.tabIndex = -1;
+                dummy.style.position = 'fixed';
+                dummy.style.opacity = '0';
+                dummy.style.pointerEvents = 'none';
+                dummy.style.height = '1px';
+                dummy.style.width = '1px';
+                document.body.appendChild(dummy);
+                try {
+                    dummy.focus({ preventScroll: true });
+                } catch (err) {
+                    dummy.focus();
+                }
+                setTimeout(() => dummy.remove(), 0);
+            };
+
+            const rescueFocus = (target, reason) => {
+                if (!target || !(target instanceof Element)) return;
+                if ('disabled' in target && target.disabled) return;
+                lastEditable = target;
+                forceNoDrag(target);
+                forceNoDragAncestors(target);
+                if (!document.hasFocus()) {
+                    focusNativeWindow(reason || 'rescue');
+                    resetWindowFocus(reason || 'rescue');
+                }
+                focusWebContents(reason || 'rescue');
+                focusSandbox();
+                const hadReadOnly = 'readOnly' in target && target.readOnly;
+                if (hadReadOnly) target.readOnly = false;
+                try {
+                    target.focus({ preventScroll: true });
+                } catch (err) {
+                    target.focus();
+                }
+                if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+                    try {
+                        const len = target.value?.length ?? 0;
+                        target.setSelectionRange(len, len);
+                    } catch (err) {
+                        // Ignore selection failures.
+                    }
+                }
+                if (hadReadOnly) target.readOnly = true;
+            };
+
+            const logClick = (event) => {
+                const target = event.target;
+                const topElement = document.elementFromPoint?.(event.clientX, event.clientY);
+                const wc = window.remote?.getCurrentWebContents?.();
+                const info = {
+                    target: describeElement(target),
+                    top: describeElement(topElement),
+                    x: event.clientX,
+                    y: event.clientY,
+                    active: describeElement(document.activeElement),
+                    hasFocus: document.hasFocus(),
+                    webContentsFocused: wc?.isFocused?.(),
+                };
+                if (target instanceof Element) {
+                    const style = window.getComputedStyle(target);
+                    info.pointerEvents = style.pointerEvents;
+                    info.zIndex = style.zIndex;
+                    info.opacity = style.opacity;
+                }
+                if (topElement instanceof Element) {
+                    const style = window.getComputedStyle(topElement);
+                    info.topPointerEvents = style.pointerEvents;
+                    info.topZIndex = style.zIndex;
+                    info.topOpacity = style.opacity;
+                }
+                const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+                console.log(`${logPrefix} click`, info, path.map(describeElement).filter(Boolean));
+            };
+
+            const checkOverlayCandidates = (reason) => {
+                if (!document.elementsFromPoint) return;
+                const x = Math.floor(window.innerWidth / 2);
+                const y = Math.floor(window.innerHeight / 2);
+                const stack = document.elementsFromPoint(x, y);
+                const candidates = [];
+                for (const el of stack) {
+                    if (!(el instanceof Element)) continue;
+                    const style = window.getComputedStyle(el);
+                    if (style.pointerEvents === 'none') continue;
+                    if (style.display === 'none' || style.visibility === 'hidden') continue;
+                    const zIndex = Number.parseInt(style.zIndex, 10);
+                    const opacity = Number.parseFloat(style.opacity);
+                    if (!Number.isFinite(zIndex) || zIndex < 999) continue;
+                    if (!Number.isFinite(opacity) || opacity > 0.05) continue;
+                    const rect = el.getBoundingClientRect();
+                    if (rect.width < window.innerWidth * 0.9 || rect.height < window.innerHeight * 0.9) continue;
+                    candidates.push({
+                        element: describeElement(el),
+                        zIndex: style.zIndex,
+                        opacity: style.opacity,
+                        pointerEvents: style.pointerEvents,
+                        position: style.position,
+                    });
+                }
+                if (candidates.length) {
+                    console.warn(`${logPrefix} overlay candidates`, reason, candidates);
+                }
+            };
+
+            const isEditableTarget = (el) => el && el.matches?.(editableSelector);
+
+            const getEditableFromPoint = (x, y) => {
+                if (!document.elementsFromPoint) return null;
+                const stack = document.elementsFromPoint(x, y);
+                for (const el of stack) {
+                    if (isEditableTarget(el)) return el;
+                }
+                for (const el of stack) {
+                    if (el instanceof HTMLLabelElement && el.htmlFor) {
+                        const input = document.getElementById(el.htmlFor);
+                        if (input && isEditableTarget(input)) return input;
+                    }
+                }
+                return null;
+            };
+
+            let nativeEventsBound = false;
+            const bindNativeWindowEvents = () => {
+                if (nativeEventsBound) return;
+                const win = window.remote?.getCurrentWindow?.();
+                if (!win?.on) return;
+                nativeEventsBound = true;
+                win.on('focus', () => {
+                    resetWindowFocus('native-window-focus-event');
+                    focusWebContents('native-window-focus-event');
+                });
+                win.on('blur', () => {
+                    needsRescue = true;
+                });
+            };
+            bindNativeWindowEvents();
+
+            const handlePointer = (event) => {
+                const target = event.target;
+                const candidate = isEditableTarget(target)
+                    ? target
+                    : getEditableFromPoint(event.clientX, event.clientY);
+                if (!document.hasFocus()) {
+                    focusNativeWindow('pointerdown');
+                    focusWebContents('pointerdown');
+                }
+                if (candidate) {
+                    rescueFocus(candidate, 'pointerdown');
+                    requestAnimationFrame(() => {
+                        if (document.activeElement !== candidate) {
+                            resetWindowFocus('pointerdown-retry');
+                            rescueFocus(candidate, 'pointerdown-retry');
+                            scanDragRegions('pointerdown-retry');
+                        }
+                    });
+                } else {
+                    checkOverlayCandidates('pointerdown');
+                }
+            };
+
+            document.addEventListener('click', (event) => {
+                logClick(event);
+                checkOverlayCandidates('click');
+            }, true);
+
+            document.addEventListener('pointerdown', handlePointer, true);
+            document.addEventListener('mousedown', handlePointer, true);
+            document.addEventListener('mouseover', (event) => {
+                if (isEditableTarget(event.target)) {
+                    forceNoDrag(event.target);
+                    forceNoDragAncestors(event.target);
+                }
+            }, true);
+
+            document.addEventListener('focusin', (event) => {
+                if (isEditableTarget(event.target)) {
+                    forceNoDrag(event.target);
+                    forceNoDragAncestors(event.target);
+                    lastEditable = event.target;
+                }
+            }, true);
+
+            window.addEventListener('focus', () => {
+                if (needsRescue && lastEditable) {
+                    rescueFocus(lastEditable, 'window-focus');
+                    needsRescue = false;
+                }
+                resetWindowFocus('window-focus');
+                focusWebContents('window-focus');
+                checkOverlayCandidates('window-focus');
+                scanDragRegions('window-focus');
+            });
+
+            window.addEventListener('blur', () => {
+                needsRescue = true;
+            });
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    if (needsRescue && lastEditable) {
+                        rescueFocus(lastEditable, 'visibility-visible');
+                        needsRescue = false;
+                    }
+                    resetWindowFocus('visibility-visible');
+                    focusWebContents('visibility-visible');
+                    checkOverlayCandidates('visibility-visible');
+                }
+            });
+
+            setTimeout(() => {
+                resetWindowFocus('initial');
+                checkOverlayCandidates('initial');
+                scanDragRegions('initial');
+            }, 200);
         })();
     </script>
 

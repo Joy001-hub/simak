@@ -1,11 +1,11 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="page-heading" style="align-items:center;">
+    <div class="page-heading" style="margin-bottom:24px;">
         <div>
             <a href="{{ route('penjualan.index') }}" class="chip ghost" style="padding:6px 10px;">&larr; Kembali</a>
-            <h1 class="heading-title" style="margin-top:8px;">Detail Penjualan</h1>
-            <p class="heading-sub">Invoice: {{ $penjualan['invoice'] }}</p>
+            <h2 style="font-size:20px; font-weight:700; color:#1E293B; margin:8px 0 0 0;">Detail Penjualan</h2>
+            <p style="font-size:12px; color:#64748B; margin:4px 0 0 0;">Invoice: {{ $penjualan['invoice'] }}</p>
         </div>
         <div class="filter-row">
             <button id="sendReminder" class="chip ghost" style="border:1px solid #22c55e; color:#166534;">Kirim Tagihan</button>
@@ -223,7 +223,7 @@
      src="{{ $receiptLogoUrl }}"
      alt="Logo Perusahaan"
      style="max-width:100%; max-height:100%; object-fit:contain; display:block;"
-     onerror="this.onerror=null;this.src='{{ asset('/logo-app.png') }}';">
+     onerror="this.onerror=null;this.src='{{ asset('logo-profile.png') }}';">
                             </div>
                             <div>
                                 <div style="font-size:20px; font-weight:800;">{{ optional($companyProfile)->name ?? config('company.name') }}</div>

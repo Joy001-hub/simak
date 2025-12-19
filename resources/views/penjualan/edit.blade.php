@@ -1,9 +1,12 @@
 @extends('layouts.app')
 
 @section('content')
-    <h1 class="heading-title">Edit Penjualan</h1>
-
-
+    <div class="page-heading" style="margin-bottom:24px;">
+        <div>
+            <h2 style="font-size:20px; font-weight:700; color:#1E293B; margin:0;">Edit Penjualan</h2>
+            <p style="font-size:12px; color:#64748B; margin:4px 0 0 0;">Ubah data transaksi penjualan</p>
+        </div>
+    </div>
 
     <form id="saleForm" action="{{ route('penjualan.update', $sale) }}" method="POST" class="card"
         style="max-width:960px; gap:14px;">
@@ -20,7 +23,8 @@
                         <option value="{{ $lot->id }}" data-base-price="{{ $lot->base_price }}"
                             data-project="{{ optional($lot->project)->name }}" data-area="{{ $lot->area }}"
                             @if($sale->lot_id == $lot->id) selected @endif>{{ optional($lot->project)->name }} /
-                            {{ $lot->block_number }}</option>
+                            {{ $lot->block_number }}
+                        </option>
                     @endforeach
                 </select>
             </div>
@@ -40,7 +44,8 @@
                     <option value="">Pilih Sales</option>
                     @foreach($marketers as $marketer)
                         <option value="{{ $marketer->id }}" @if($sale->marketer_id == $marketer->id) selected @endif>
-                            {{ $marketer->name }}</option>
+                            {{ $marketer->name }}
+                        </option>
                     @endforeach
                 </select>
             </div>
@@ -109,7 +114,7 @@
             <div class="field">
                 <label class="hint">Tenor (bulan)</label>
                 <input class="input" type="number" name="tenor_months" id="tenorInput" min="0"
-                    value="{{ old('tenor_months', $sale->tenor_months ?? '') }}" placeholder="Tenor (bulan)">
+                    value="{{ old('tenor_months', $sale->tenor_months) ?: '' }}" placeholder="Misal: 12, 24, 36">
             </div>
             <div class="field">
                 <label class="hint">Tanggal Jatuh Tempo (1-31)</label>
@@ -121,12 +126,12 @@
             <div class="field">
                 <label class="hint">Uang Muka (%)</label>
                 <input class="input" type="number" name="dp_percent" id="dpPercentInput" min="0" max="100"
-                    value="{{ old('dp_percent', '') }}" placeholder="Uang muka (%)">
+                    value="{{ old('dp_percent') ?: '' }}" placeholder="Misal: 10, 20, 30">
             </div>
             <div class="field">
                 <label class="hint">Uang Muka (Rp)</label>
                 <input class="input" type="number" name="down_payment" id="dpInput" min="0"
-                    value="{{ old('down_payment', $sale->down_payment) }}" placeholder="Nominal uang muka">
+                    value="{{ old('down_payment', $sale->down_payment) ?: '' }}" placeholder="Masukkan nominal DP">
                 <small class="hint" id="dpPercent">0% dari harga</small>
             </div>
         </div>
@@ -186,18 +191,22 @@
                     if (Number.isFinite(Number(data?.base_price)) && (!preserveExisting || isEmptyOrZero(basePrice.value))) {
                         basePrice.value = data.base_price;
                     }
-                    const defaults = data?.payment_defaults || {};
-                    if ((forceDpDefaults || isEmptyOrZero(dpPercentInput.value)) && Number.isFinite(Number(defaults.dp_percent))) {
-                        dpPercentInput.value = defaults.dp_percent;
-                    }
-                    if ((forceDpDefaults || isEmptyOrZero(dpInput.value)) && Number.isFinite(Number(defaults.dp_nominal))) {
-                        dpInput.value = defaults.dp_nominal;
-                    }
-                    if ((forceDpDefaults || isEmptyOrZero(tenorInput.value)) && Number.isFinite(Number(defaults.tenor_months))) {
-                        tenorInput.value = defaults.tenor_months;
-                    }
-                    if ((forceDpDefaults || isEmptyOrZero(dueDayInput.value)) && Number.isFinite(Number(defaults.due_day))) {
-                        dueDayInput.value = defaults.due_day;
+                    // Only fill installment defaults if payment method is installment
+                    const isInstallment = paymentMethod.value === 'installment';
+                    if (isInstallment) {
+                        const defaults = data?.payment_defaults || {};
+                        if ((forceDpDefaults || isEmptyOrZero(dpPercentInput.value)) && Number.isFinite(Number(defaults.dp_percent))) {
+                            dpPercentInput.value = defaults.dp_percent;
+                        }
+                        if ((forceDpDefaults || isEmptyOrZero(dpInput.value)) && Number.isFinite(Number(defaults.dp_nominal))) {
+                            dpInput.value = defaults.dp_nominal;
+                        }
+                        if ((forceDpDefaults || isEmptyOrZero(tenorInput.value)) && Number.isFinite(Number(defaults.tenor_months))) {
+                            tenorInput.value = defaults.tenor_months;
+                        }
+                        if ((forceDpDefaults || isEmptyOrZero(dueDayInput.value)) && Number.isFinite(Number(defaults.due_day))) {
+                            dueDayInput.value = defaults.due_day;
+                        }
                     }
                 } catch (e) {
                     // noop
@@ -215,6 +224,31 @@
                 const net = Math.max(0, base - disc + ppjb + shm + oth);
                 netPrice.value = net;
                 grandTotal.value = net;
+
+                // Handle Cash Keras & KPR Bank - disable tenor, due day, and DP fields
+                // Both are full payment to developer (no installments from developer's perspective)
+                const isFullPayment = paymentMethod.value === 'cash' || paymentMethod.value === 'kpr';
+                const paymentLabel = paymentMethod.value === 'cash' ? 'Cash Keras' : 'KPR Bank';
+
+                if (isFullPayment) {
+                    tenorInput.value = '';
+                    tenorInput.disabled = true;
+                    dueDayInput.value = '';
+                    dueDayInput.disabled = true;
+                    dpPercentInput.value = '';
+                    dpPercentInput.disabled = true;
+                    dpInput.value = '';
+                    dpInput.disabled = true;
+                    dpPercentEl.textContent = `${paymentLabel} - pembayaran penuh`;
+                    installmentEstimate.value = `N/A (${paymentLabel})`;
+                    return; // No need to calculate DP/installments
+                }
+
+                // Re-enable fields for Installment only
+                tenorInput.disabled = false;
+                dueDayInput.disabled = false;
+                dpPercentInput.disabled = false;
+                dpInput.disabled = false;
 
                 const dpPercentVal = Number(dpPercentInput.value || 0);
                 const dpInputVal = Number(dpInput.value || 0);
@@ -238,10 +272,6 @@
                 const outstanding = Math.max(0, net - dp);
                 const monthly = (tenor > 0 && paymentMethod.value === 'installment') ? Math.ceil(outstanding / tenor) : outstanding;
                 installmentEstimate.value = formatIDR(monthly);
-
-                // tenor & due date selalu dapat diisi
-                tenorInput.disabled = false;
-                dueDayInput.disabled = false;
             }
 
             [basePrice, discount, extraPpjb, extraShm, extraOther, dpPercentInput, dpInput, tenorInput, paymentMethod].forEach(el => el?.addEventListener('input', recalc));

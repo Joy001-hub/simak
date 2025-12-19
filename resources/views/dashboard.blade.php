@@ -275,7 +275,7 @@
                         </div>
                         <label class="toggle flex items-center gap-2 cursor-pointer">
                             <input id="projectionToggle" type="checkbox"
-                                class="rounded text-primary focus:ring-primary size-3.5">
+                                class="rounded text-primary focus:ring-0 border-none size-3.5">
                             <span class="text-[10px] text-slate-600">Proyeksi AI</span>
                         </label>
                     </div>
@@ -514,21 +514,33 @@
                         ? (meta.horizonMonths || 12)
                         : 12;
 
-                const clean = values.filter(v => Number.isFinite(v));
+                const clean = values.filter(v => Number.isFinite(v) && v > 0);
                 const hasHistory = clean.length >= 3;
                 const useAI = hasHistory;
-                const changes = [];
-                for (let i = 1; i < clean.length; i++) {
-                    changes.push(clean[i] - clean[i - 1]);
-                }
-                const drift = changes.length ? changes.reduce((a, b) => a + b, 0) / changes.length : 0;
-                const mean = drift;
-                const variance = changes.length
-                    ? changes.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / changes.length
-                    : 0;
-                const volBase = Math.sqrt(variance) || Math.abs(drift) * 0.6 || Math.max((clean[clean.length - 1] || 1) * 0.05, 1);
 
-                // Deterministic seed dari data historis supaya proyeksi statis
+                // ========================================
+                // Holt's Double Exponential Smoothing
+                // ========================================
+                // α (alpha) = smoothing factor for level (0-1, higher = more responsive)
+                // β (beta) = smoothing factor for trend (0-1, higher = more responsive)
+                const alpha = 0.4; // Level smoothing - moderately responsive
+                const beta = 0.3;  // Trend smoothing - slightly conservative
+
+                // Initialize level and trend
+                let level = clean[0] || 0;
+                let trend = clean.length >= 2 ? (clean[1] - clean[0]) : 0;
+
+                // Apply Holt's method to historical data
+                for (let i = 1; i < clean.length; i++) {
+                    const prevLevel = level;
+                    level = alpha * clean[i] + (1 - alpha) * (level + trend);
+                    trend = beta * (level - prevLevel) + (1 - beta) * trend;
+                }
+
+                // Dampen trend for long-term projections (prevent unrealistic growth)
+                const dampingFactor = 0.9; // 10% reduction per period
+
+                // Deterministic seed for consistent small variations
                 const seedFromValues = (arr) => {
                     let h = 0;
                     arr.forEach((v, i) => {
@@ -545,7 +557,7 @@
                     return ((t ^ t >>> 14) >>> 0) / 4294967296;
                 };
                 const rng = mulberry32(seedFromValues(clean.length ? clean : [0]));
-                const randUniform = () => rng() * 2 - 1; // -1..1
+                const randVariation = () => (rng() * 0.1 - 0.05); // ±5% small variation
 
                 const lastPeriod = (() => {
                     const reversed = [...periods].reverse();
@@ -556,12 +568,16 @@
                     return new Date();
                 })();
 
-                let last = clean.length ? clean[clean.length - 1] : 0;
+                // Generate future values using Holt's forecast with damping
                 const futureValues = [];
+                let cumulativeDamping = 1;
                 for (let i = 0; i < horizon; i++) {
-                    const step = drift + volBase * 0.9 * randUniform();
-                    last = Math.max(0, last + step);
-                    futureValues.push(Number(last.toFixed(2)));
+                    cumulativeDamping *= dampingFactor;
+                    const dampedTrend = trend * cumulativeDamping;
+                    const baseProjection = level + dampedTrend * (i + 1);
+                    const variation = 1 + randVariation();
+                    const projectedValue = Math.max(0, baseProjection * variation);
+                    futureValues.push(Number(projectedValue.toFixed(2)));
                 }
 
                 const futureLabels = Array.from({ length: horizon }, (_, idx) => formatPeriodLabel(addStep(lastPeriod, idx + 1)));
@@ -622,8 +638,12 @@
                 });
                 const values = sorted.map(e => actualMap.get(e.key) ?? null);
                 const comparisonData = sorted.map(() => null);
-                // Pastikan projected dimulai dengan titik historis terakhir untuk sambungan mulus
+                // Pastikan projected hanya tampil jika toggle proyeksi aktif
                 const projected = sorted.map((e, idx) => {
+                    // Jika proyeksi toggle off, semua nilai null
+                    if (!projectionToggle || !projectionToggle.checked) {
+                        return null;
+                    }
                     if (Number.isInteger(e.futureIndex)) {
                         return projection.futureValues[e.futureIndex];
                     }
@@ -714,34 +734,13 @@
                             maxBarThickness: 32
                         },
                         {
-                            type: 'line',
+                            type: 'bar',
                             id: 'projection',
                             label: projectionLabel,
                             data: projected,
-                            borderColor: downColor,
-                            borderWidth: 2.5,
-                            tension: 0,
-                            pointRadius: 6,
-                            pointHoverRadius: 7,
-                            pointBorderColor: '#0b1a2b',
-                            pointBorderWidth: 1.2,
-                            spanGaps: true,
-                            segment: {
-                                borderColor: ctx => {
-                                    const { p0, p1 } = ctx;
-                                    if (!p0 || !p1 || p0.skip || p1.skip) return downColor;
-                                    return p1.parsed.y >= p0.parsed.y ? upColor : downColor;
-                                }
-                            },
-                            pointBackgroundColor: ctx => {
-                                const i = ctx.dataIndex;
-                                const data = ctx.dataset.data || [];
-                                const curr = data[i];
-                                const prev = i > 0 ? data[i - 1] : null;
-                                if (curr === null || curr === undefined) return 'transparent';
-                                if (prev === null || prev === undefined) return upColor;
-                                return curr >= prev ? upColor : downColor;
-                            },
+                            backgroundColor: '#9ca3af',
+                            borderRadius: 10,
+                            maxBarThickness: 32
                         }
                     ]
                 },

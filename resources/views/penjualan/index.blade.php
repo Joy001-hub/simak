@@ -1,10 +1,14 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="page-heading" style="align-items:center;">
-        <h2 class="text-xl font-bold text-text-main tracking-tight">Penjualan</h2>
+    <div class="page-heading" style="margin-bottom:24px;">
+        <div>
+            <h2 style="font-size:20px; font-weight:700; color:#1E293B; margin:0;">Penjualan</h2>
+            <p style="font-size:12px; color:#64748B; margin:4px 0 0 0;">Kelola data penjualan kavling</p>
+        </div>
 
-        <a href="{{ route('penjualan.create') }}" class="chip is-active" style="display:flex; align-items:center; gap:8px;">
+        <a href="{{ route('penjualan.create') }}" class="chip is-active"
+            style="display:inline-flex; align-items:center; gap:8px;">
             <span style="font-size:18px; line-height:0.9;">+</span> Tambah Penjualan
         </a>
     </div>
@@ -66,7 +70,8 @@
                     <label class="hint">Status DP</label>
                     <select name="status_dp" class="input">
                         @foreach (['Semua', 'Lunas', 'Belum'] as $opt)
-                            <option value="{{ $opt }}" @selected(($filters['status_dp'] ?? 'Semua') === $opt)>{{ $opt }}</option>
+                            <option value="{{ $opt }}" @selected(($filters['status_dp'] ?? 'Semua') === $opt)>{{ $opt }}
+                            </option>
                         @endforeach
                     </select>
                 </div>
@@ -74,7 +79,8 @@
                     <label class="hint">Status Penjualan</label>
                     <select name="status_penjualan" class="input">
                         @foreach (['Semua', 'Paid Off', 'Active', 'Batal (Refund)'] as $opt)
-                            <option value="{{ $opt }}" @selected(($filters['status_penjualan'] ?? 'Semua') === $opt)>{{ $opt }}
+                            <option value="{{ $opt }}" @selected(($filters['status_penjualan'] ?? 'Semua') === $opt)>
+                                {{ $opt }}
                             </option>
                         @endforeach
                     </select>
@@ -188,7 +194,8 @@
                             $statusColor = $saleStatus === 'Paid Off' ? '#0f9d58' : ($saleStatus === 'Active' ? '#2563eb' : '#6b7280');
                         @endphp
                         <tr>
-                            <td style="text-align:center; white-space:nowrap;" title="{{ $statusTagihan }}">{!! $icon !!}</td>
+                            <td style="text-align:center; white-space:nowrap;" title="{{ $statusTagihan }}">{!! $icon !!}
+                            </td>
                             <td style="font-weight:700; color:#0f172a; white-space:nowrap;">{{ $item['kavling'] }}</td>
                             <td style="white-space:nowrap;">{{ $item['pembeli'] }}</td>
                             <td style="white-space:nowrap;">{{ $item['tgl_booking'] }}</td>
@@ -280,21 +287,21 @@
                         statusColor = '#b45309';
                     }
                     return `<tr>
-                                                    <td style="text-align:center; white-space:nowrap;" title="${statusTagihan}">${icon}</td>
-                                                    <td style="font-weight:700; color:#0f172a; white-space:nowrap;">${item.kavling ?? '-'}</td>
-                                                    <td style="white-space:nowrap;">${item.pembeli ?? '-'}</td>
-                                                    <td style="white-space:nowrap;">${item.tgl_booking ?? '-'}</td>
-                                                    <td style="white-space:nowrap;">${item.metode_bayar ?? '-'}</td>
-                                                    <td style="white-space:nowrap;">Rp ${harga}</td>
-                                                    <td style="color:${outstandingRed}; font-weight:700; white-space:nowrap;">Rp ${sisa}</td>
-                                                    <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${dpBg}; color:${dpColor}; font-weight:700; white-space:nowrap;">${dpStatus}</span></td>
-                                                    <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${statusBg}; color:${statusColor}; font-weight:700; white-space:nowrap;">${saleStatus === 'Paid Off' ? '🤝 ' : ''}${saleStatus || '-'}</span></td>
-                                                    <td style="white-space:nowrap;">${item.estimasi_lunas ?? '-'}</td>
-                                                    <td style="white-space:nowrap;">${item.marketing ?? '-'}</td>
-                                                    <td style="padding-left:14px; white-space: nowrap;">
-                                                        <a href="/penjualan/${item.id}" class="btn light" style="padding:8px 10px; border-color:#e5e7eb;">Detail</a>
-                                                    </td>
-                                                </tr>`;
+                                                                        <td style="text-align:center; white-space:nowrap;" title="${statusTagihan}">${icon}</td>
+                                                                        <td style="font-weight:700; color:#0f172a; white-space:nowrap;">${item.kavling ?? '-'}</td>
+                                                                        <td style="white-space:nowrap;">${item.pembeli ?? '-'}</td>
+                                                                        <td style="white-space:nowrap;">${item.tgl_booking ?? '-'}</td>
+                                                                        <td style="white-space:nowrap;">${item.metode_bayar ?? '-'}</td>
+                                                                        <td style="white-space:nowrap;">Rp ${harga}</td>
+                                                                        <td style="color:${outstandingRed}; font-weight:700; white-space:nowrap;">Rp ${sisa}</td>
+                                                                        <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${dpBg}; color:${dpColor}; font-weight:700; white-space:nowrap;">${dpStatus}</span></td>
+                                                                        <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${statusBg}; color:${statusColor}; font-weight:700; white-space:nowrap;">${saleStatus === 'Paid Off' ? '🤝 ' : ''}${saleStatus || '-'}</span></td>
+                                                                        <td style="white-space:nowrap;">${item.estimasi_lunas ?? '-'}</td>
+                                                                        <td style="white-space:nowrap;">${item.marketing ?? '-'}</td>
+                                                                        <td style="padding-left:14px; white-space: nowrap;">
+                                                                            <a href="/penjualan/${item.id}" class="btn light" style="padding:8px 10px; border-color:#e5e7eb;">Detail</a>
+                                                                        </td>
+                                                                    </tr>`;
                 }).join('');
             };
 

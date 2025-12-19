@@ -5,11 +5,12 @@ use App\Models\Sale;
 use App\Models\Payment;
 use App\Models\Lot;
 use App\Models\Project;
-use Illuminate\Support\Facades\Cache;
 class DashboardController extends Controller
 {
     public function index(Request $request)
     {
+        // Reset dashboard updates counter when user views dashboard
+        session()->forget('dashboard_updates');
         $periodOptions = ['Minggu Ini', 'Bulan Ini', 'Tahun Ini', 'Tahun Lalu', 'Semua'];
         $activePeriod = $request->query('periode', 'Tahun Ini');
         $dateFrom = null;
@@ -90,33 +91,21 @@ class DashboardController extends Controller
                 break;
         }
         $compareEligible = $compareEnabled && $canCompare && $compareFrom && $compareTo;
-        $cacheKey = 'dashboard:' . md5(json_encode(['user' => optional(auth()->user())->id, 'period' => $activePeriod, 'from' => $dateFrom?->toDateString(), 'to' => $dateTo?->toDateString(), 'compare' => $compareEligible, 'compare_from' => $compareFrom?->toDateString(), 'compare_to' => $compareTo?->toDateString(),]));
-        $cached = Cache::remember($cacheKey, now()->addMinutes(5), function () use ($dateFrom, $dateTo, $compareEligible, $compareFrom, $compareTo) {
-            return [
-                'sales' => Sale::with(['payments', 'lot.project', 'marketer'])->when($dateFrom, fn($q) => $q->whereDate('booking_date', '>=', $dateFrom))->when($dateTo, fn($q) => $q->whereDate('booking_date', '<=', $dateTo))->get(),
-                'comparisonSales' => $compareEligible ? Sale::with(['payments', 'lot.project', 'marketer'])->whereDate('booking_date', '>=', $compareFrom)->whereDate('booking_date', '<=', $compareTo)->get() : collect(),
-                'payments' => Payment::when($dateFrom, fn($q) => $q->whereDate('due_date', '>=', $dateFrom))->when($dateTo, fn($q) => $q->whereDate('due_date', '<=', $dateTo))->get(),
-                'availableLots' => Lot::where('status', 'available')->with('project')->get(),
-                'projectAvailCounts' => Project::withCount([
-                    'lots as avail_count' => function ($q) {
-                        $q->where('status', 'available');
-                    }
-                ])->get(),
-                'projectsWithLots' => Project::with('lots')->get(),
-                'globalActiveSalesCount' => Sale::where('status', 'active')->count(),
-                'globalAvailableLotsCount' => Lot::where('status', 'available')->count(),
-                'globalOutstanding' => Sale::whereNotIn('status', ['canceled', Sale::STATUS_CANCELED_HAPUS, Sale::STATUS_CANCELED_REFUND, Sale::STATUS_CANCELED_OPER_KREDIT])->sum('outstanding_amount'),
-            ];
-        });
-        $sales = $cached['sales'];
-        $comparisonSales = $cached['comparisonSales'];
-        $payments = $cached['payments'];
-        $availableLots = $cached['availableLots'];
-        $projectAvailCounts = $cached['projectAvailCounts'];
-        $projectsWithLots = $cached['projectsWithLots'];
-        $globalActiveSalesCount = $cached['globalActiveSalesCount'];
-        $globalAvailableLotsCount = $cached['globalAvailableLotsCount'];
-        $globalOutstanding = $cached['globalOutstanding'];
+
+        // Fetch data directly without caching for real-time updates
+        $sales = Sale::with(['payments', 'lot.project', 'marketer'])->when($dateFrom, fn($q) => $q->whereDate('booking_date', '>=', $dateFrom))->when($dateTo, fn($q) => $q->whereDate('booking_date', '<=', $dateTo))->get();
+        $comparisonSales = $compareEligible ? Sale::with(['payments', 'lot.project', 'marketer'])->whereDate('booking_date', '>=', $compareFrom)->whereDate('booking_date', '<=', $compareTo)->get() : collect();
+        $payments = Payment::when($dateFrom, fn($q) => $q->whereDate('due_date', '>=', $dateFrom))->when($dateTo, fn($q) => $q->whereDate('due_date', '<=', $dateTo))->get();
+        $availableLots = Lot::where('status', 'available')->with('project')->get();
+        $projectAvailCounts = Project::withCount([
+            'lots as avail_count' => function ($q) {
+                $q->where('status', 'available');
+            }
+        ])->get();
+        $projectsWithLots = Project::with('lots')->get();
+        $globalActiveSalesCount = Sale::where('status', 'active')->count();
+        $globalAvailableLotsCount = Lot::where('status', 'available')->count();
+        $globalOutstanding = Sale::whereNotIn('status', ['canceled', Sale::STATUS_CANCELED_HAPUS, Sale::STATUS_CANCELED_REFUND, Sale::STATUS_CANCELED_OPER_KREDIT])->sum('outstanding_amount');
         $compareEnabled = $compareEligible;
         $firstSaleDate = $sales->whereNotNull('booking_date')->min('booking_date');
         $lastSaleDate = $sales->whereNotNull('booking_date')->max('booking_date');

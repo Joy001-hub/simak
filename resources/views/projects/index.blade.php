@@ -1,11 +1,13 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="page-heading" style="align-items:center;">
+    <div class="page-heading" style="margin-bottom:24px;">
         <div>
-            <h2 class="text-xl font-bold text-text-main tracking-tight">Projects</h2>
+            <h2 style="font-size:20px; font-weight:700; color:#1E293B; margin:0;">Projects</h2>
+            <p style="font-size:12px; color:#64748B; margin:4px 0 0 0;">Kelola proyek perumahan</p>
         </div>
-        <a href="{{ route('projects.create') }}" class="chip is-active" style="display:flex; align-items:center; gap:8px;">
+        <a href="{{ route('projects.create') }}" class="chip is-active"
+            style="display:inline-flex; align-items:center; gap:8px;">
             <span style="font-size:18px; line-height:0.9;">+</span> Add Project
         </a>
     </div>

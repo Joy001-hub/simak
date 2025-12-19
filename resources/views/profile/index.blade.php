@@ -1,10 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="page-heading" style="align-items:center; margin-bottom:6px;">
+    <div class="page-heading" style="margin-bottom:24px;">
         <div>
-            <h2 class="text-xl font-bold text-text-main tracking-tight">Profil Perusahaan</h2>
-
+            <h2 style="font-size:20px; font-weight:700; color:#1E293B; margin:0;">Profil Perusahaan</h2>
+            <p style="font-size:12px; color:#64748B; margin:4px 0 0 0;">Kelola informasi perusahaan</p>
         </div>
     </div>
 
@@ -59,13 +59,13 @@
                         if ($logoPath) {
                             $displayUrl = url('/native-img/logos/' . $filename) . '?v=' . time();
                         } else {
-                            $displayUrl = asset('assets/img/upload-placeholder.png');
+                            $displayUrl = asset('logo-profile.png');
                         }
                     @endphp
 
                     <img id="logoPreview" src="{{ $displayUrl }}" alt="Logo Preview"
                         style="max-height: 150px; width: auto; object-fit: contain; border: 1px solid #eee; border-radius: 8px;"
-                        onerror="this.onerror=null;this.src='{{ asset('/logo-app.png') }}';">
+                        onerror="this.onerror=null;this.src='{{ asset('logo-profile.png') }}';">
                 </div>
                 <div style="display:flex; flex-direction:column; gap:4px;">
                     <span class="hint">Format: 512x512, PNG/JPG, maks 1 MB.</span>

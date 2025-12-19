@@ -1,7 +1,12 @@
 @extends('layouts.app')
 
 @section('content')
-    <h1 class="heading-title">Tambah Buyer</h1>
+    <div class="page-heading" style="margin-bottom:24px;">
+        <div>
+            <h2 style="font-size:20px; font-weight:700; color:#1E293B; margin:0;">Tambah Buyer</h2>
+            <p style="font-size:12px; color:#64748B; margin:4px 0 0 0;">Masukkan data pelanggan baru</p>
+        </div>
+    </div>
     <form action="{{ route('buyers.store') }}" method="POST" class="card" style="max-width:600px; gap:10px;">
         @csrf
         @if(isset($fromSale))

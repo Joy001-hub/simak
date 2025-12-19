@@ -1,5 +1,534 @@
 <?php
- namespace App\Http\Controllers; use Illuminate\Http\Request; use App\Models\Sale; use App\Models\Lot; use App\Models\Buyer; use App\Models\Marketer; use Illuminate\Database\Eloquent\Builder; use App\Http\Requests\SaleRequest; use App\Models\Payment; use Carbon\Carbon; use App\Models\CompanyProfile; class PenjualanController extends Controller { private function availableLots(?Sale $currentSale = null) { return Lot::with('project') ->where(function (Builder $outer) use ($currentSale) { $outer->where('status', 'available') ->orWhere(function (Builder $q) use ($currentSale) { $q->whereDoesntHave('sale', function (Builder $q2) { $q2->whereNotIn('status', [ 'canceled', Sale::STATUS_CANCELED_HAPUS, Sale::STATUS_CANCELED_REFUND, Sale::STATUS_CANCELED_OPER_KREDIT, ]); }); if ($currentSale) { $q->orWhereHas('sale', function (Builder $q2) use ($currentSale) { $q2->where('id', $currentSale->id); }); } }); }) ->get(); } public function cancel(Request $request, Sale $sale) { $type = $request->input('type'); $sale->status_before_cancel = $sale->status_before_cancel ?? $sale->status; if ($type === 'hapus') { $sale->status = Sale::STATUS_CANCELED_HAPUS; $sale->save(); $sale->lot?->update(['status' => 'available']); } elseif ($type === 'refund') { $amount = (int) str_replace('.', '', $request->input('refund_amount', 0)); $sale->status = Sale::STATUS_CANCELED_REFUND; $sale->refund_amount = $amount; $sale->save(); $sale->lot?->update(['status' => 'available']); } elseif ($type === 'oper_kredit') { $newBuyerId = $request->input('new_buyer_id'); $newMarketerId = $request->input('new_marketer_id'); $oldBuyerName = optional($sale->buyer)->name; $sale->status_before_cancel = "Oper dari: {$oldBuyerName} (ID: {$sale->buyer_id})"; $sale->buyer_id = $newBuyerId; if ($newMarketerId) { $sale->marketer_id = $newMarketerId; } $sale->save(); return redirect()->route('penjualan.show', $sale) ->with('success', "Oper kredit berhasil! Pembeli diubah dari {$oldBuyerName} ke pembeli baru."); } return back()->with('success', 'Penjualan berhasil dibatalkan'); } public function updateNotes(Request $request, Sale $sale) { $sale->notes = $request->input('notes'); $sale->save(); return redirect()->route('penjualan.show', $sale)->with('success', 'Catatan berhasil diperbarui'); } public function index(Request $request) { $filters = [ 'kavling' => $request->query('kavling', ''), 'pembeli' => $request->query('pembeli', ''), 'status_tagihan' => $request->query('status_tagihan', 'Semua'), 'status_dp' => $request->query('status_dp', 'Semua'), 'status_penjualan' => $request->query('status_penjualan', 'Semua'), 'marketing' => $request->query('marketing', 'Semua'), 'metode_bayar' => $request->query('metode_bayar', 'Semua'), 'tgl_booking_dari' => $request->query('tgl_booking_dari', ''), 'tgl_booking_sampai' => $request->query('tgl_booking_sampai', ''), 'harga_min' => $request->query('harga_min', ''), 'harga_max' => $request->query('harga_max', ''), 'sort_by' => $request->query('sort_by', 'booking_date'), 'sort_dir' => $request->query('sort_dir', 'desc'), ]; $query = Sale::with(['lot.project', 'buyer', 'marketer']); if ($filters['kavling'] !== '') { $key = $filters['kavling']; $parts = array_map('trim', explode('/', $key)); $query->where(function ($q) use ($key, $parts) { if (count($parts) >= 2) { [$projectPart, $blockPart] = $parts; $q->whereHas('lot', function ($q2) use ($projectPart, $blockPart) { $q2->where('block_number', 'like', "%{$blockPart}%") ->whereHas('project', function ($q3) use ($projectPart) { $q3->where('name', 'like', "%{$projectPart}%"); }); }); } else { $q->whereHas('lot', function ($q2) use ($key) { $q2->where('block_number', 'like', "%{$key}%"); })->orWhereHas('lot.project', function ($q3) use ($key) { $q3->where('name', 'like', "%{$key}%"); }); } }); } if ($filters['pembeli'] !== '') { $key = $filters['pembeli']; $query->whereHas('buyer', function ($q) use ($key) { $q->where('name', 'like', "%{$key}%"); }); } if ($filters['metode_bayar'] !== 'Semua') { $map = [ 'Cash Keras' => 'cash', 'Angsuran In-house' => 'installment', 'KPR Bank' => 'kpr', 'cash' => 'cash', 'installment' => 'installment', 'kpr' => 'kpr', ]; $method = $map[$filters['metode_bayar']] ?? $filters['metode_bayar']; $query->where('payment_method', $method); } if ($filters['marketing'] !== 'Semua' && $filters['marketing'] !== '') { $query->where('marketer_id', $filters['marketing']); } if ($filters['status_penjualan'] !== 'Semua') { $statusMap = [ 'Paid Off' => ['paid_off'], 'Active' => ['active'], 'Canceled' => [\App\Models\Sale::STATUS_CANCELED_REFUND, 'canceled'], 'Batal (Refund)' => [\App\Models\Sale::STATUS_CANCELED_REFUND, 'canceled'], ]; $statuses = $statusMap[$filters['status_penjualan']] ?? [$filters['status_penjualan']]; $query->whereIn('status', $statuses); } if ($filters['status_tagihan'] !== 'Semua') { $today = Carbon::today(); if ($filters['status_tagihan'] === 'Ada Tunggakan') { $query->whereHas('payments', function ($q) use ($today) { $q->where('status', 'unpaid')->whereDate('due_date', '<', $today); }); } elseif ($filters['status_tagihan'] === 'Jatuh Tempo < 7 Hari') { $targetDate = $today->copy()->addDays(7); $query->whereHas('payments', function ($q) use ($today, $targetDate) { $q->where('status', 'unpaid')->whereDate('due_date', '>=', $today)->whereDate('due_date', '<=', $targetDate); })->whereDoesntHave('payments', function ($q) use ($today) { $q->where('status', 'unpaid')->whereDate('due_date', '<', $today); }); } elseif ($filters['status_tagihan'] === 'Aman') { $query->where('outstanding_amount', '<=', 0); } } if ($filters['status_dp'] !== 'Semua') { if ($filters['status_dp'] === 'Lunas') { $query->where('down_payment', '>', 0); } elseif ($filters['status_dp'] === 'Belum') { $query->where('down_payment', '<=', 0); } } if ($filters['tgl_booking_dari']) { $query->whereDate('booking_date', '>=', $filters['tgl_booking_dari']); } if ($filters['tgl_booking_sampai']) { $query->whereDate('booking_date', '<=', $filters['tgl_booking_sampai']); } if ($filters['harga_min'] !== '') { $query->where('price', '>=', (int) $filters['harga_min']); } if ($filters['harga_max'] !== '') { $query->where('price', '<=', (int) $filters['harga_max']); } $penjualan = $query->get() ->map(function ($sale) { $today = Carbon::today(); $targetDate = $today->copy()->addDays(7); $overduePayment = $sale->payments()->where('status', 'unpaid')->whereDate('due_date', '<', $today)->first(); $upcomingPayment = $sale->payments()->where('status', 'unpaid')->whereDate('due_date', '>=', $today)->whereDate('due_date', '<=', $targetDate)->first(); $statusTagihan = 'Aman'; if ($overduePayment) { $statusTagihan = 'Ada Tunggakan'; } elseif ($upcomingPayment) { $statusTagihan = 'Jatuh Tempo < 7 Hari'; } elseif (($sale->outstanding_amount ?? 0) > 0) { $statusTagihan = 'Aktif'; } $bookingTs = $sale->booking_date ? $sale->booking_date->timestamp : 0; $estimasiDate = optional(optional($sale->booking_date)?->addMonths($sale->tenor_months)); $estimasiTs = $estimasiDate ? $estimasiDate->timestamp : 0; $statusColor = 'info'; if ($sale->status === 'paid_off') $statusColor = 'success'; elseif (in_array($sale->status, ['canceled', Sale::STATUS_CANCELED_HAPUS, Sale::STATUS_CANCELED_REFUND, Sale::STATUS_CANCELED_OPER_KREDIT])) $statusColor = 'danger'; $statusValMap = [ 'canceled' => 0, Sale::STATUS_CANCELED_HAPUS => 0, Sale::STATUS_CANCELED_REFUND => 0, Sale::STATUS_CANCELED_OPER_KREDIT => 0, 'active' => 1, 'paid_off' => 2 ]; $statusVal = $statusValMap[$sale->status] ?? 0; $statusLabel = 'Canceled'; if ($sale->status === 'active') $statusLabel = 'Active'; elseif ($sale->status === 'paid_off') $statusLabel = 'Paid Off'; elseif ($sale->status === Sale::STATUS_CANCELED_HAPUS) $statusLabel = 'Batal (Hapus)'; elseif ($sale->status === Sale::STATUS_CANCELED_REFUND) $statusLabel = 'Batal (Refund)'; elseif ($sale->status === Sale::STATUS_CANCELED_OPER_KREDIT) $statusLabel = 'Oper Kredit'; return [ 'id' => $sale->id, 'kavling' => optional($sale->lot)->project?->name . ' / ' . optional($sale->lot)->block_number, 'pembeli' => optional($sale->buyer)->name, 'buyer_phone' => optional($sale->buyer)->phone, 'tgl_booking' => optional($sale->booking_date)?->format('d M Y'), 'tgl_booking_ts' => $bookingTs, 'metode_bayar' => $sale->payment_method === 'cash' ? 'Cash Keras' : ($sale->payment_method === 'kpr' ? 'KPR Bank' : 'Angsuran In-house'), 'harga_jual' => $sale->price, 'sisa_piutang' => $sale->outstanding_amount, 'status_dp' => $sale->down_payment > 0 ? 'Lunas' : 'Belum', 'status' => $statusLabel, 'estimasi_lunas' => $estimasiDate?->format('M Y'), 'estimasi_ts' => $estimasiTs, 'status_value' => $statusVal, 'marketing' => optional($sale->marketer)->name, 'status_color' => $statusColor, 'status_tagihan' => $statusTagihan, ]; }) ->toArray(); $sortBy = $filters['sort_by']; $sortDir = strtolower($filters['sort_dir']) === 'asc' ? 'asc' : 'desc'; $penjualan = collect($penjualan)->sortBy(function ($item) use ($sortBy) { return match ($sortBy) { 'booking_date' => $item['tgl_booking_ts'] ?? 0, 'estimasi_lunas' => $item['estimasi_ts'] ?? 0, 'sisa_piutang' => $item['sisa_piutang'] ?? 0, 'status' => $item['status_value'] ?? 0, default => $item['tgl_booking_ts'] ?? 0, }; }, SORT_REGULAR, $sortDir === 'desc')->values()->all(); if ($filters['kavling'] !== '') { $needle = mb_strtolower($filters['kavling']); $penjualan = array_values(array_filter($penjualan, function ($row) use ($needle) { $label = mb_strtolower($row['kavling'] ?? ''); return stripos($label, $needle) !== false; })); } $marketers = Marketer::all(); if ($request->wantsJson()) { $kavlingSuggestions = collect($penjualan)->pluck('kavling')->filter()->unique()->take(12)->values(); $pembeliSuggestions = collect($penjualan)->pluck('pembeli')->filter()->unique()->take(12)->values(); return response()->json([ 'data' => $penjualan, 'suggestions' => [ 'kavling' => $kavlingSuggestions, 'pembeli' => $pembeliSuggestions, ], ]); } return view('penjualan.index', [ 'filters' => $filters, 'penjualan' => $penjualan, 'marketers' => $marketers, ]); } public function show(string $id) { $sale = Sale::with(['lot.project', 'buyer', 'marketer', 'payments'])->findOrFail($id); $companyProfile = CompanyProfile::first(); $invoiceFormat = optional($companyProfile)->invoice_format ?? 'INV/{YYYY}/{MM}/{####}'; $receiptFormat = optional($companyProfile)->receipt_format ?? 'KW/{YYYY}/{MM}/{####}'; $booking = $sale->booking_date ?? now(); $invoiceNumber = $this->formatDocumentNumber($invoiceFormat, $sale, $booking); $receiptNumber = $this->formatDocumentNumber($receiptFormat, $sale, $booking); $penjualan = [ 'id' => $sale->id, 'invoice' => $invoiceNumber, 'kavling' => optional($sale->lot)->project?->name . ' / ' . optional($sale->lot)->block_number, 'pembeli' => optional($sale->buyer)->name, 'buyer_phone' => optional($sale->buyer)->phone, 'tgl_booking' => optional($sale->booking_date)?->format('d M Y'), 'metode_bayar' => $sale->payment_method === 'cash' ? 'Cash Keras' : ($sale->payment_method === 'kpr' ? 'KPR Bank' : 'Angsuran In-house'), 'marketing' => optional($sale->marketer)->name, 'harga_jual' => $sale->price, 'total_terbayar' => $sale->paid_amount, 'sisa_piutang' => $sale->outstanding_amount, 'tenor' => $sale->tenor_months, 'tgl_jatuh_tempo' => $sale->due_day, 'company' => [ 'nama' => $companyProfile->name ?? 'Nama Perusahaan', 'alamat' => $companyProfile->address ?? 'Alamat Belum Diatur', 'telepon' => $companyProfile->phone ?? '-', 'email' => $companyProfile->email ?? '-', 'logo_url' => $companyProfile->logo_path ? asset('storage/' . $companyProfile->logo_path) : null, ], 'schedule' => $sale->payments->map(function ($p) { return [ 'no' => $p->id, 'jatuh_tempo' => optional($p->due_date)?->format('d M Y'), 'jumlah' => $p->amount, 'status' => $p->status, ]; })->values()->toArray(), 'payments' => $sale->payments->map(function ($p) { return [ 'tanggal' => optional($p->due_date)?->format('d M Y'), 'keterangan' => $p->note ?? 'Pembayaran', 'jumlah' => $p->amount, ]; })->values()->toArray(), ]; $buyers = Buyer::all(); $marketers = Marketer::all(); return view('penjualan.show', compact('penjualan', 'sale', 'receiptNumber', 'buyers', 'marketers')); } public function create(Request $request) { $lots = $this->availableLots(); $buyers = Buyer::all(); $marketers = Marketer::all(); $parentSaleId = $request->query('from_sale'); $buyerId = $request->query('buyer_id'); return view('penjualan.create', compact('lots', 'buyers', 'marketers', 'parentSaleId', 'buyerId')); } public function store(SaleRequest $request) { $data = $request->validated(); $base = (int) ($data['base_price'] ?? 0); $priceInput = (int) ($data['price'] ?? 0); $discount = (int) ($data['discount'] ?? 0); $ppjb = (int) ($data['extra_ppjb'] ?? 0); $shm = (int) ($data['extra_shm'] ?? 0); $other = (int) ($data['extra_other'] ?? 0); $tenor = (int) ($data['tenor_months'] ?? 0); $dueDay = $data['payment_method'] === 'installment' ? max(1, min(28, (int) ($data['due_day'] ?? 1))) : null; $netPrice = max(0, ($priceInput ?: $base) - $discount + $ppjb + $shm + $other); $dpPercent = (float) ($data['dp_percent'] ?? 0); $dpInput = (int) ($data['down_payment'] ?? 0); $dp = $dpInput > 0 ? $dpInput : (int) round($netPrice * ($dpPercent / 100)); $data['price'] = $netPrice; $data['down_payment'] = $dp; $data['tenor_months'] = $tenor; $data['due_day'] = $dueDay; $data['paid_amount'] = min($netPrice, $dp); $data['outstanding_amount'] = max(0, $netPrice - $data['paid_amount']); $data['status'] = $data['outstanding_amount'] > 0 ? 'active' : 'paid_off'; if ($data['payment_method'] !== 'installment') { $data['tenor_months'] = 0; $data['due_day'] = null; } $sale = Sale::create($data); $this->syncDownPaymentHistory($sale); if ($data['payment_method'] === 'installment') { $this->rebuildSchedule($sale); } return redirect()->route('penjualan.index')->with('success', 'Penjualan ditambahkan'); } public function destroy(Sale $penjualan) { $penjualan->delete(); return redirect()->route('penjualan.index')->with('success', 'Penjualan dihapus'); } public function edit(Sale $penjualan) { $lots = $this->availableLots($penjualan); $buyers = Buyer::all(); $marketers = Marketer::all(); return view('penjualan.edit', [ 'sale' => $penjualan, 'lots' => $lots, 'buyers' => $buyers, 'marketers' => $marketers, ]); } public function update(SaleRequest $request, Sale $penjualan) { if ($request->has('notes_only')) { $penjualan->notes = $request->input('notes'); $penjualan->save(); return redirect()->route('penjualan.show', $penjualan)->with('success', 'Catatan berhasil diperbarui'); } $data = $request->validated(); $base = (int) ($data['base_price'] ?? 0); $priceInput = (int) ($data['price'] ?? 0); $discount = (int) ($data['discount'] ?? 0); $ppjb = (int) ($data['extra_ppjb'] ?? 0); $shm = (int) ($data['extra_shm'] ?? 0); $other = (int) ($data['extra_other'] ?? 0); $tenor = (int) ($data['tenor_months'] ?? 0); $dueDay = $data['payment_method'] === 'installment' ? max(1, min(28, (int) ($data['due_day'] ?? 1))) : null; $netPrice = max(0, ($priceInput ?: $base) - $discount + $ppjb + $shm + $other); $dpPercent = (float) ($data['dp_percent'] ?? 0); $dpInput = (int) ($data['down_payment'] ?? 0); $dp = $dpInput > 0 ? $dpInput : (int) round($netPrice * ($dpPercent / 100)); $outstandingFromSchedule = $penjualan->payments()->whereIn('status', ['unpaid', 'partial', 'overdue'])->sum('amount'); $paidSum = $penjualan->payments()->where('status', 'paid')->sum('amount'); $dpBuffer = $penjualan->payments()->where('note', 'Down Payment')->exists() ? 0 : $dp; if ($outstandingFromSchedule > 0) { $paidAmount = max(0, $netPrice - $outstandingFromSchedule); $outstanding = $outstandingFromSchedule; } else { $paidAmount = min($netPrice, $dpBuffer + $paidSum); $outstanding = max(0, $netPrice - $paidAmount); } $data['price'] = $netPrice; $data['down_payment'] = $dp; $data['tenor_months'] = $tenor; $data['due_day'] = $dueDay; $data['paid_amount'] = $paidAmount; $data['outstanding_amount'] = $outstanding; $data['status'] = $outstanding > 0 ? 'active' : 'paid_off'; $penjualan->update($data); $this->syncDownPaymentHistory($penjualan); if ($data['payment_method'] === 'installment') { $this->rebuildSchedule($penjualan); } else { $penjualan->payments()->where('status', 'unpaid')->delete(); } return redirect()->route('penjualan.index')->with('success', 'Penjualan diperbarui'); } private function formatDocumentNumber(string $format, Sale $sale, Carbon $date): string { $replaced = str_replace( ['{YYYY}', '{MM}', '{DD}', '{####}'], [$date->format('Y'), $date->format('m'), $date->format('d'), str_pad((string) $sale->id, 4, '0', STR_PAD_LEFT)], $format ); return $replaced; } private function rebuildSchedule(Sale $sale): void { $outstanding = max(0, (int) $sale->outstanding_amount); if ($outstanding <= 0 || ($sale->tenor_months ?? 0) <= 0) { $sale->payments()->where('status', 'unpaid')->delete(); return; } $paid = $sale->payments()->where('status', 'paid')->where(function ($q) { $q->whereNull('note')->orWhere('note', 'like', 'Angsuran%'); })->orderBy('due_date')->get(); $paidCount = $paid->count(); $remainingTenor = max(1, (int) $sale->tenor_months - $paidCount); $baseDate = $paid->last()?->due_date ?? ($sale->booking_date ?? Carbon::now()); $day = max(1, min(28, (int) ($sale->due_day ?? ($baseDate instanceof Carbon ? $baseDate->day : 1)))); $startDate = ($baseDate instanceof Carbon ? $baseDate->copy() : Carbon::parse($baseDate ?? now()))->day($day); if ($paid->last()) { $startDate->addMonth(); } elseif ($startDate->lessThan(Carbon::now()->day($day))) { $startDate->addMonth(); } $sale->payments()->where('status', 'unpaid')->delete(); $perTerm = intdiv($outstanding, $remainingTenor); $remainder = $outstanding - ($perTerm * $remainingTenor); for ($i = 0; $i < $remainingTenor; $i++) { $amount = $perTerm + ($i < $remainder ? 1 : 0); $dueDate = $startDate->copy()->addMonths($i); $sale->payments()->create([ 'due_date' => $dueDate, 'amount' => $amount, 'status' => 'unpaid', 'note' => 'Angsuran ke-' . ($paidCount + $i + 1), ]); } } private function syncDownPaymentHistory(Sale $sale): void { $dpAmount = max(0, (int) $sale->down_payment); $dpPayment = $sale->payments()->where('note', 'Down Payment')->first(); if ($dpAmount > 0) { if (!$dpPayment) { $dpPayment = $sale->payments()->create([ 'due_date' => $sale->booking_date ?? now(), 'amount' => $dpAmount, 'status' => 'paid', 'note' => 'Down Payment', 'paid_at' => $sale->booking_date ?? now(), ]); } else { $dpPayment->update([ 'amount' => $dpAmount, 'status' => 'paid', 'due_date' => $sale->booking_date ?? $dpPayment->due_date ?? now(), 'paid_at' => $dpPayment->paid_at ?? ($sale->booking_date ?? now()), 'note' => 'Down Payment', ]); } } elseif ($dpPayment) { $dpPayment->delete(); } $outstandingFromSchedule = $sale->payments()->whereIn('status', ['unpaid', 'partial', 'overdue'])->sum('amount'); $paidSum = $sale->payments()->where('status', 'paid')->sum('amount'); if ($outstandingFromSchedule > 0) { $sale->outstanding_amount = $outstandingFromSchedule; $sale->paid_amount = max(0, $sale->price - $outstandingFromSchedule); } else { $sale->paid_amount = min($sale->price, $paidSum); $sale->outstanding_amount = max(0, $sale->price - $sale->paid_amount); } $sale->status = $sale->outstanding_amount <= 0 ? 'paid_off' : 'active'; $sale->save(); } } 
+namespace App\Http\Controllers;
+use Illuminate\Http\Request;
+use App\Models\Sale;
+use App\Models\Lot;
+use App\Models\Buyer;
+use App\Models\Marketer;
+use Illuminate\Database\Eloquent\Builder;
+use App\Http\Requests\SaleRequest;
+use App\Models\Payment;
+use Carbon\Carbon;
+use App\Models\CompanyProfile;
+class PenjualanController extends Controller
+{
+    private function availableLots(?Sale $currentSale = null)
+    {
+        return Lot::with('project')->where(function (Builder $outer) use ($currentSale) {
+            $outer->where('status', 'available')->orWhere(function (Builder $q) use ($currentSale) {
+                $q->whereDoesntHave('sale', function (Builder $q2) {
+                    $q2->whereNotIn('status', ['canceled', Sale::STATUS_CANCELED_HAPUS, Sale::STATUS_CANCELED_REFUND, Sale::STATUS_CANCELED_OPER_KREDIT,]);
+                });
+                if ($currentSale) {
+                    $q->orWhereHas('sale', function (Builder $q2) use ($currentSale) {
+                        $q2->where('id', $currentSale->id);
+                    });
+                }
+            });
+        })->get();
+    }
+    public function cancel(Request $request, Sale $sale)
+    {
+        $type = $request->input('type');
+        $sale->status_before_cancel = $sale->status_before_cancel ?? $sale->status;
+        if ($type === 'hapus') {
+            $sale->status = Sale::STATUS_CANCELED_HAPUS;
+            $sale->save();
+            $sale->lot?->update(['status' => 'available']);
+            // Increment dashboard updates counter
+            session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
+        } elseif ($type === 'refund') {
+            $amount = (int) str_replace('.', '', $request->input('refund_amount', 0));
+            $sale->status = Sale::STATUS_CANCELED_REFUND;
+            $sale->refund_amount = $amount;
+            $sale->save();
+            $sale->lot?->update(['status' => 'available']);
+            // Increment dashboard updates counter
+            session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
+        } elseif ($type === 'oper_kredit') {
+            $newBuyerId = $request->input('new_buyer_id');
+            $newMarketerId = $request->input('new_marketer_id');
+            $oldBuyerName = optional($sale->buyer)->name;
+            $sale->status_before_cancel = "Oper dari: {$oldBuyerName} (ID: {$sale->buyer_id})";
+            $sale->buyer_id = $newBuyerId;
+            if ($newMarketerId) {
+                $sale->marketer_id = $newMarketerId;
+            }
+            $sale->save();
+            // Increment dashboard updates counter
+            session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
+            return redirect()->route('penjualan.show', $sale)->with('success', "Oper kredit berhasil! Pembeli diubah dari {$oldBuyerName} ke pembeli baru.");
+        }
+        return back()->with('success', 'Penjualan berhasil dibatalkan');
+    }
+    public function updateNotes(Request $request, Sale $sale)
+    {
+        $sale->notes = $request->input('notes');
+        $sale->save();
+        return redirect()->route('penjualan.show', $sale)->with('success', 'Catatan berhasil diperbarui');
+    }
+    public function index(Request $request)
+    {
+        $filters = ['kavling' => $request->query('kavling', ''), 'pembeli' => $request->query('pembeli', ''), 'status_tagihan' => $request->query('status_tagihan', 'Semua'), 'status_dp' => $request->query('status_dp', 'Semua'), 'status_penjualan' => $request->query('status_penjualan', 'Semua'), 'marketing' => $request->query('marketing', 'Semua'), 'metode_bayar' => $request->query('metode_bayar', 'Semua'), 'tgl_booking_dari' => $request->query('tgl_booking_dari', ''), 'tgl_booking_sampai' => $request->query('tgl_booking_sampai', ''), 'harga_min' => $request->query('harga_min', ''), 'harga_max' => $request->query('harga_max', ''), 'sort_by' => $request->query('sort_by', 'booking_date'), 'sort_dir' => $request->query('sort_dir', 'desc'),];
+        $query = Sale::with(['lot.project', 'buyer', 'marketer']);
+        if ($filters['kavling'] !== '') {
+            $key = $filters['kavling'];
+            $parts = array_map('trim', explode('/', $key));
+            $query->where(function ($q) use ($key, $parts) {
+                if (count($parts) >= 2) {
+                    [$projectPart, $blockPart] = $parts;
+                    $q->whereHas('lot', function ($q2) use ($projectPart, $blockPart) {
+                        $q2->where('block_number', 'like', "%{$blockPart}%")->whereHas('project', function ($q3) use ($projectPart) {
+                            $q3->where('name', 'like', "%{$projectPart}%");
+                        });
+                    });
+                } else {
+                    $q->whereHas('lot', function ($q2) use ($key) {
+                        $q2->where('block_number', 'like', "%{$key}%");
+                    })->orWhereHas('lot.project', function ($q3) use ($key) {
+                        $q3->where('name', 'like', "%{$key}%");
+                    });
+                }
+            });
+        }
+        if ($filters['pembeli'] !== '') {
+            $key = $filters['pembeli'];
+            $query->whereHas('buyer', function ($q) use ($key) {
+                $q->where('name', 'like', "%{$key}%");
+            });
+        }
+        if ($filters['metode_bayar'] !== 'Semua') {
+            $map = ['Cash Keras' => 'cash', 'Angsuran In-house' => 'installment', 'KPR Bank' => 'kpr', 'cash' => 'cash', 'installment' => 'installment', 'kpr' => 'kpr',];
+            $method = $map[$filters['metode_bayar']] ?? $filters['metode_bayar'];
+            $query->where('payment_method', $method);
+        }
+        if ($filters['marketing'] !== 'Semua' && $filters['marketing'] !== '') {
+            $query->where('marketer_id', $filters['marketing']);
+        }
+        if ($filters['status_penjualan'] !== 'Semua') {
+            $statusMap = ['Paid Off' => ['paid_off'], 'Active' => ['active'], 'Canceled' => [\App\Models\Sale::STATUS_CANCELED_REFUND, 'canceled'], 'Batal (Refund)' => [\App\Models\Sale::STATUS_CANCELED_REFUND, 'canceled'],];
+            $statuses = $statusMap[$filters['status_penjualan']] ?? [$filters['status_penjualan']];
+            $query->whereIn('status', $statuses);
+        }
+        if ($filters['status_tagihan'] !== 'Semua') {
+            $today = Carbon::today();
+            if ($filters['status_tagihan'] === 'Ada Tunggakan') {
+                $query->whereHas('payments', function ($q) use ($today) {
+                    $q->where('status', 'unpaid')->whereDate('due_date', '<', $today);
+                });
+            } elseif ($filters['status_tagihan'] === 'Jatuh Tempo < 7 Hari') {
+                $targetDate = $today->copy()->addDays(7);
+                $query->whereHas('payments', function ($q) use ($today, $targetDate) {
+                    $q->where('status', 'unpaid')->whereDate('due_date', '>=', $today)->whereDate('due_date', '<=', $targetDate);
+                })->whereDoesntHave('payments', function ($q) use ($today) {
+                    $q->where('status', 'unpaid')->whereDate('due_date', '<', $today);
+                });
+            } elseif ($filters['status_tagihan'] === 'Aman') {
+                $query->where('outstanding_amount', '<=', 0);
+            }
+        }
+        if ($filters['status_dp'] !== 'Semua') {
+            if ($filters['status_dp'] === 'Lunas') {
+                $query->where('down_payment', '>', 0);
+            } elseif ($filters['status_dp'] === 'Belum') {
+                $query->where('down_payment', '<=', 0);
+            }
+        }
+        if ($filters['tgl_booking_dari']) {
+            $query->whereDate('booking_date', '>=', $filters['tgl_booking_dari']);
+        }
+        if ($filters['tgl_booking_sampai']) {
+            $query->whereDate('booking_date', '<=', $filters['tgl_booking_sampai']);
+        }
+        if ($filters['harga_min'] !== '') {
+            $query->where('price', '>=', (int) $filters['harga_min']);
+        }
+        if ($filters['harga_max'] !== '') {
+            $query->where('price', '<=', (int) $filters['harga_max']);
+        }
+        $penjualan = $query->get()->map(function ($sale) {
+            $today = Carbon::today();
+            $targetDate = $today->copy()->addDays(7);
+            $overduePayment = $sale->payments()->where('status', 'unpaid')->whereDate('due_date', '<', $today)->first();
+            $upcomingPayment = $sale->payments()->where('status', 'unpaid')->whereDate('due_date', '>=', $today)->whereDate('due_date', '<=', $targetDate)->first();
+            $statusTagihan = 'Aman';
+            if ($overduePayment) {
+                $statusTagihan = 'Ada Tunggakan';
+            } elseif ($upcomingPayment) {
+                $statusTagihan = 'Jatuh Tempo < 7 Hari';
+            } elseif (($sale->outstanding_amount ?? 0) > 0) {
+                $statusTagihan = 'Aktif';
+            }$bookingTs = $sale->booking_date ? $sale->booking_date->timestamp : 0;
+            $estimasiDate = optional(optional($sale->booking_date)?->addMonths($sale->tenor_months));
+            $estimasiTs = $estimasiDate ? $estimasiDate->timestamp : 0;
+            $statusColor = 'info';
+            if ($sale->status === 'paid_off')
+                $statusColor = 'success';
+            elseif (in_array($sale->status, ['canceled', Sale::STATUS_CANCELED_HAPUS, Sale::STATUS_CANCELED_REFUND, Sale::STATUS_CANCELED_OPER_KREDIT]))
+                $statusColor = 'danger';
+            $statusValMap = ['canceled' => 0, Sale::STATUS_CANCELED_HAPUS => 0, Sale::STATUS_CANCELED_REFUND => 0, Sale::STATUS_CANCELED_OPER_KREDIT => 0, 'active' => 1, 'paid_off' => 2];
+            $statusVal = $statusValMap[$sale->status] ?? 0;
+            $statusLabel = 'Canceled';
+            if ($sale->status === 'active')
+                $statusLabel = 'Active';
+            elseif ($sale->status === 'paid_off')
+                $statusLabel = 'Paid Off';
+            elseif ($sale->status === Sale::STATUS_CANCELED_HAPUS)
+                $statusLabel = 'Batal (Hapus)';
+            elseif ($sale->status === Sale::STATUS_CANCELED_REFUND)
+                $statusLabel = 'Batal (Refund)';
+            elseif ($sale->status === Sale::STATUS_CANCELED_OPER_KREDIT)
+                $statusLabel = 'Oper Kredit';
+            // Status DP: Cash Keras & KPR Bank langsung Lunas (tidak ada konsep DP)
+            $statusDp = in_array($sale->payment_method, ['cash', 'kpr'])
+                ? 'Lunas'
+                : ($sale->down_payment > 0 ? 'Lunas' : 'Belum');
+            return ['id' => $sale->id, 'kavling' => optional($sale->lot)->project?->name . ' / ' . optional($sale->lot)->block_number, 'pembeli' => optional($sale->buyer)->name, 'buyer_phone' => optional($sale->buyer)->phone, 'tgl_booking' => optional($sale->booking_date)?->format('d M Y'), 'tgl_booking_ts' => $bookingTs, 'metode_bayar' => $sale->payment_method === 'cash' ? 'Cash Keras' : ($sale->payment_method === 'kpr' ? 'KPR Bank' : 'Angsuran In-house'), 'harga_jual' => $sale->price, 'sisa_piutang' => $sale->outstanding_amount, 'status_dp' => $statusDp, 'status' => $statusLabel, 'estimasi_lunas' => $estimasiDate?->format('M Y'), 'estimasi_ts' => $estimasiTs, 'status_value' => $statusVal, 'marketing' => optional($sale->marketer)->name, 'status_color' => $statusColor, 'status_tagihan' => $statusTagihan,];
+        })->toArray();
+        $sortBy = $filters['sort_by'];
+        $sortDir = strtolower($filters['sort_dir']) === 'asc' ? 'asc' : 'desc';
+        $penjualan = collect($penjualan)->sortBy(function ($item) use ($sortBy) {
+            return match ($sortBy) { 'booking_date' => $item['tgl_booking_ts'] ?? 0, 'estimasi_lunas' => $item['estimasi_ts'] ?? 0, 'sisa_piutang' => $item['sisa_piutang'] ?? 0, 'status' => $item['status_value'] ?? 0, default => $item['tgl_booking_ts'] ?? 0, };
+        }, SORT_REGULAR, $sortDir === 'desc')->values()->all();
+        if ($filters['kavling'] !== '') {
+            $needle = mb_strtolower($filters['kavling']);
+            $penjualan = array_values(array_filter($penjualan, function ($row) use ($needle) {
+                $label = mb_strtolower($row['kavling'] ?? '');
+                return stripos($label, $needle) !== false;
+            }));
+        }
+        $marketers = Marketer::all();
+        if ($request->wantsJson()) {
+            $kavlingSuggestions = collect($penjualan)->pluck('kavling')->filter()->unique()->take(12)->values();
+            $pembeliSuggestions = collect($penjualan)->pluck('pembeli')->filter()->unique()->take(12)->values();
+            return response()->json(['data' => $penjualan, 'suggestions' => ['kavling' => $kavlingSuggestions, 'pembeli' => $pembeliSuggestions,],]);
+        }
+        return view('penjualan.index', ['filters' => $filters, 'penjualan' => $penjualan, 'marketers' => $marketers,]);
+    }
+    public function show(string $id)
+    {
+        $sale = Sale::with(['lot.project', 'buyer', 'marketer', 'payments'])->findOrFail($id);
+        $companyProfile = CompanyProfile::first();
+        $invoiceFormat = optional($companyProfile)->invoice_format ?? 'INV/{YYYY}/{MM}/{####}';
+        $receiptFormat = optional($companyProfile)->receipt_format ?? 'KW/{YYYY}/{MM}/{####}';
+        $booking = $sale->booking_date ?? now();
+        $invoiceNumber = $this->formatDocumentNumber($invoiceFormat, $sale, $booking);
+        $receiptNumber = $this->formatDocumentNumber($receiptFormat, $sale, $booking);
+        $penjualan = [
+            'id' => $sale->id,
+            'invoice' => $invoiceNumber,
+            'kavling' => optional($sale->lot)->project?->name . ' / ' . optional($sale->lot)->block_number,
+            'pembeli' => optional($sale->buyer)->name,
+            'buyer_phone' => optional($sale->buyer)->phone,
+            'tgl_booking' => optional($sale->booking_date)?->format('d M Y'),
+            'metode_bayar' => $sale->payment_method === 'cash' ? 'Cash Keras' : ($sale->payment_method === 'kpr' ? 'KPR Bank' : 'Angsuran In-house'),
+            'marketing' => optional($sale->marketer)->name,
+            'harga_jual' => $sale->price,
+            'total_terbayar' => $sale->paid_amount,
+            'sisa_piutang' => $sale->outstanding_amount,
+            'tenor' => $sale->tenor_months,
+            'tgl_jatuh_tempo' => $sale->due_day,
+            'company' => ['nama' => $companyProfile->name ?? 'Nama Perusahaan', 'alamat' => $companyProfile->address ?? 'Alamat Belum Diatur', 'telepon' => $companyProfile->phone ?? '-', 'email' => $companyProfile->email ?? '-', 'logo_url' => $companyProfile->logo_path ? asset('storage/' . $companyProfile->logo_path) : null,],
+            'schedule' => $sale->payments->map(function ($p) {
+                return ['no' => $p->id, 'jatuh_tempo' => optional($p->due_date)?->format('d M Y'), 'jumlah' => $p->amount, 'status' => $p->status,];
+            })->values()->toArray(),
+            'payments' => $sale->payments->map(function ($p) {
+                return ['tanggal' => optional($p->due_date)?->format('d M Y'), 'keterangan' => $p->note ?? 'Pembayaran', 'jumlah' => $p->amount,];
+            })->values()->toArray(),
+        ];
+        $buyers = Buyer::all();
+        $marketers = Marketer::all();
+        return view('penjualan.show', compact('penjualan', 'sale', 'receiptNumber', 'buyers', 'marketers'));
+    }
+    public function create(Request $request)
+    {
+        $lots = $this->availableLots();
+        $buyers = Buyer::all();
+        $marketers = Marketer::all();
+        $parentSaleId = $request->query('from_sale');
+        $buyerId = $request->query('buyer_id');
+        return view('penjualan.create', compact('lots', 'buyers', 'marketers', 'parentSaleId', 'buyerId'));
+    }
+    public function store(SaleRequest $request)
+    {
+        $data = $request->validated();
+        $base = (int) ($data['base_price'] ?? 0);
+        $priceInput = (int) ($data['price'] ?? 0);
+        $discount = (int) ($data['discount'] ?? 0);
+        $ppjb = (int) ($data['extra_ppjb'] ?? 0);
+        $shm = (int) ($data['extra_shm'] ?? 0);
+        $other = (int) ($data['extra_other'] ?? 0);
+        $netPrice = max(0, ($priceInput ?: $base) - $discount + $ppjb + $shm + $other);
+
+        // Set common data
+        $data['price'] = $netPrice;
+
+        // Handle Cash Keras & KPR Bank - full payment, no DP, no tenor, no outstanding
+        // Both are treated as immediate full payment to developer
+        if (in_array($data['payment_method'], ['cash', 'kpr'])) {
+            $paymentLabel = $data['payment_method'] === 'cash' ? 'Cash Keras' : 'KPR Bank';
+
+            $data['down_payment'] = 0;
+            $data['tenor_months'] = 0;
+            $data['due_day'] = null;
+            $data['paid_amount'] = $netPrice;
+            $data['outstanding_amount'] = 0;
+            $data['status'] = 'paid_off';
+
+            $sale = Sale::create($data);
+
+            // Create single payment record
+            $sale->payments()->create([
+                'due_date' => $sale->booking_date ?? now(),
+                'amount' => $netPrice,
+                'status' => 'paid',
+                'note' => "Pembayaran Penuh ({$paymentLabel})",
+                'paid_at' => $sale->booking_date ?? now(),
+            ]);
+
+            // Update lot status to 'sold'
+            if ($sale->lot) {
+                $sale->lot->update(['status' => 'sold']);
+            }
+
+            return redirect()->route('penjualan.index')->with('success', 'Penjualan ditambahkan');
+        }
+
+        // Handle Installment only (Angsuran In-house)
+        $tenor = (int) ($data['tenor_months'] ?? 0);
+        $dueDay = max(1, min(28, (int) ($data['due_day'] ?? 1)));
+        $dpPercent = (float) ($data['dp_percent'] ?? 0);
+        $dpInput = (int) ($data['down_payment'] ?? 0);
+        $dp = $dpInput > 0 ? $dpInput : (int) round($netPrice * ($dpPercent / 100));
+
+        // Handle DP 100% or DP >= price - treat as full payment
+        if ($dp >= $netPrice || $dpPercent >= 100) {
+            $data['down_payment'] = $netPrice;
+            $data['tenor_months'] = 0;
+            $data['due_day'] = null;
+            $data['paid_amount'] = $netPrice;
+            $data['outstanding_amount'] = 0;
+            $data['status'] = 'paid_off';
+
+            $sale = Sale::create($data);
+
+            // Create single DP payment record
+            $sale->payments()->create([
+                'due_date' => $sale->booking_date ?? now(),
+                'amount' => $netPrice,
+                'status' => 'paid',
+                'note' => 'Down Payment (100%)',
+                'paid_at' => $sale->booking_date ?? now(),
+            ]);
+
+            // Update lot status to 'sold'
+            if ($sale->lot) {
+                $sale->lot->update(['status' => 'sold']);
+            }
+
+            return redirect()->route('penjualan.index')->with('success', 'Penjualan ditambahkan');
+        }
+
+        $data['down_payment'] = $dp;
+        $data['tenor_months'] = $tenor;
+        $data['due_day'] = $dueDay;
+        $data['paid_amount'] = min($netPrice, $dp);
+        $data['outstanding_amount'] = max(0, $netPrice - $data['paid_amount']);
+        $data['status'] = $data['outstanding_amount'] > 0 ? 'active' : 'paid_off';
+
+        $sale = Sale::create($data);
+        $this->syncDownPaymentHistory($sale);
+        $this->rebuildSchedule($sale);
+
+        // Update lot status to 'sold'
+        if ($sale->lot) {
+            $sale->lot->update(['status' => 'sold']);
+        }
+
+        // Increment dashboard updates counter
+        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
+
+        return redirect()->route('penjualan.index')->with('success', 'Penjualan ditambahkan');
+    }
+    public function destroy(Sale $penjualan)
+    {
+        $penjualan->delete();
+        // Increment dashboard updates counter
+        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
+        return redirect()->route('penjualan.index')->with('success', 'Penjualan dihapus');
+    }
+    public function edit(Sale $penjualan)
+    {
+        $lots = $this->availableLots($penjualan);
+        $buyers = Buyer::all();
+        $marketers = Marketer::all();
+        return view('penjualan.edit', ['sale' => $penjualan, 'lots' => $lots, 'buyers' => $buyers, 'marketers' => $marketers,]);
+    }
+    public function update(SaleRequest $request, Sale $penjualan)
+    {
+        if ($request->has('notes_only')) {
+            $penjualan->notes = $request->input('notes');
+            $penjualan->save();
+            return redirect()->route('penjualan.show', $penjualan)->with('success', 'Catatan berhasil diperbarui');
+        }
+
+        $data = $request->validated();
+        $base = (int) ($data['base_price'] ?? 0);
+        $priceInput = (int) ($data['price'] ?? 0);
+        $discount = (int) ($data['discount'] ?? 0);
+        $ppjb = (int) ($data['extra_ppjb'] ?? 0);
+        $shm = (int) ($data['extra_shm'] ?? 0);
+        $other = (int) ($data['extra_other'] ?? 0);
+        $netPrice = max(0, ($priceInput ?: $base) - $discount + $ppjb + $shm + $other);
+
+        // Set common data
+        $data['price'] = $netPrice;
+
+        // Handle Cash Keras & KPR Bank - full payment, no DP, no tenor, no outstanding
+        if (in_array($data['payment_method'], ['cash', 'kpr'])) {
+            $paymentLabel = $data['payment_method'] === 'cash' ? 'Cash Keras' : 'KPR Bank';
+
+            $data['down_payment'] = 0;
+            $data['tenor_months'] = 0;
+            $data['due_day'] = null;
+            $data['paid_amount'] = $netPrice;
+            $data['outstanding_amount'] = 0;
+            $data['status'] = 'paid_off';
+
+            $penjualan->update($data);
+
+            // Delete all existing payments and create single payment
+            $penjualan->payments()->delete();
+            $penjualan->payments()->create([
+                'due_date' => $penjualan->booking_date ?? now(),
+                'amount' => $netPrice,
+                'status' => 'paid',
+                'note' => "Pembayaran Penuh ({$paymentLabel})",
+                'paid_at' => $penjualan->booking_date ?? now(),
+            ]);
+
+            return redirect()->route('penjualan.index')->with('success', 'Penjualan diperbarui');
+        }
+
+        // Handle Installment only (Angsuran In-house)
+        $tenor = (int) ($data['tenor_months'] ?? 0);
+        $dueDay = max(1, min(28, (int) ($data['due_day'] ?? 1)));
+        $dpPercent = (float) ($data['dp_percent'] ?? 0);
+        $dpInput = (int) ($data['down_payment'] ?? 0);
+        $dp = $dpInput > 0 ? $dpInput : (int) round($netPrice * ($dpPercent / 100));
+
+        // Handle DP 100% or DP >= price - treat as full payment (same as cash)
+        if ($dp >= $netPrice || $dpPercent >= 100) {
+            $data['down_payment'] = $netPrice;
+            $data['tenor_months'] = 0;
+            $data['due_day'] = null;
+            $data['paid_amount'] = $netPrice;
+            $data['outstanding_amount'] = 0;
+            $data['status'] = 'paid_off';
+
+            $penjualan->update($data);
+
+            // Delete all existing payments and create single DP payment
+            $penjualan->payments()->delete();
+            $penjualan->payments()->create([
+                'due_date' => $penjualan->booking_date ?? now(),
+                'amount' => $netPrice,
+                'status' => 'paid',
+                'note' => 'Down Payment (100%)',
+                'paid_at' => $penjualan->booking_date ?? now(),
+            ]);
+
+            return redirect()->route('penjualan.index')->with('success', 'Penjualan diperbarui');
+        }
+
+        $outstandingFromSchedule = $penjualan->payments()->whereIn('status', ['unpaid', 'partial', 'overdue'])->sum('amount');
+        $paidSum = $penjualan->payments()->where('status', 'paid')->sum('amount');
+        $dpBuffer = $penjualan->payments()->where('note', 'Down Payment')->exists() ? 0 : $dp;
+
+        if ($outstandingFromSchedule > 0) {
+            $paidAmount = max(0, $netPrice - $outstandingFromSchedule);
+            $outstanding = $outstandingFromSchedule;
+        } else {
+            $paidAmount = min($netPrice, $dpBuffer + $paidSum);
+            $outstanding = max(0, $netPrice - $paidAmount);
+        }
+
+        $data['down_payment'] = $dp;
+        $data['tenor_months'] = $tenor;
+        $data['due_day'] = $dueDay;
+        $data['paid_amount'] = $paidAmount;
+        $data['outstanding_amount'] = $outstanding;
+        $data['status'] = $outstanding > 0 ? 'active' : 'paid_off';
+
+        $penjualan->update($data);
+        $this->syncDownPaymentHistory($penjualan);
+        $this->rebuildSchedule($penjualan);
+
+        // Increment dashboard updates counter
+        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
+
+        return redirect()->route('penjualan.index')->with('success', 'Penjualan diperbarui');
+    }
+    private function formatDocumentNumber(string $format, Sale $sale, Carbon $date): string
+    {
+        $replaced = str_replace(['{YYYY}', '{MM}', '{DD}', '{####}'], [$date->format('Y'), $date->format('m'), $date->format('d'), str_pad((string) $sale->id, 4, '0', STR_PAD_LEFT)], $format);
+        return $replaced;
+    }
+    private function rebuildSchedule(Sale $sale): void
+    {
+        $outstanding = max(0, (int) $sale->outstanding_amount);
+        if ($outstanding <= 0 || ($sale->tenor_months ?? 0) <= 0) {
+            $sale->payments()->where('status', 'unpaid')->delete();
+            return;
+        }
+        $paid = $sale->payments()->where('status', 'paid')->where(function ($q) {
+            $q->whereNull('note')->orWhere('note', 'like', 'Angsuran%');
+        })->orderBy('due_date')->get();
+        $paidCount = $paid->count();
+        $remainingTenor = max(1, (int) $sale->tenor_months - $paidCount);
+        $baseDate = $paid->last()?->due_date ?? ($sale->booking_date ?? Carbon::now());
+        $day = max(1, min(28, (int) ($sale->due_day ?? ($baseDate instanceof Carbon ? $baseDate->day : 1))));
+        $startDate = ($baseDate instanceof Carbon ? $baseDate->copy() : Carbon::parse($baseDate ?? now()))->day($day);
+        if ($paid->last()) {
+            $startDate->addMonth();
+        } elseif ($startDate->lessThan(Carbon::now()->day($day))) {
+            $startDate->addMonth();
+        }
+        $sale->payments()->where('status', 'unpaid')->delete();
+        $perTerm = intdiv($outstanding, $remainingTenor);
+        $remainder = $outstanding - ($perTerm * $remainingTenor);
+        for ($i = 0; $i < $remainingTenor; $i++) {
+            $amount = $perTerm + ($i < $remainder ? 1 : 0);
+            $dueDate = $startDate->copy()->addMonths($i);
+            $sale->payments()->create(['due_date' => $dueDate, 'amount' => $amount, 'status' => 'unpaid', 'note' => 'Angsuran ke-' . ($paidCount + $i + 1),]);
+        }
+    }
+    private function syncDownPaymentHistory(Sale $sale): void
+    {
+        $dpAmount = max(0, (int) $sale->down_payment);
+        $dpPayment = $sale->payments()->where('note', 'Down Payment')->first();
+        if ($dpAmount > 0) {
+            if (!$dpPayment) {
+                $dpPayment = $sale->payments()->create(['due_date' => $sale->booking_date ?? now(), 'amount' => $dpAmount, 'status' => 'paid', 'note' => 'Down Payment', 'paid_at' => $sale->booking_date ?? now(),]);
+            } else {
+                $dpPayment->update(['amount' => $dpAmount, 'status' => 'paid', 'due_date' => $sale->booking_date ?? $dpPayment->due_date ?? now(), 'paid_at' => $dpPayment->paid_at ?? ($sale->booking_date ?? now()), 'note' => 'Down Payment',]);
+            }
+        } elseif ($dpPayment) {
+            $dpPayment->delete();
+        }
+        $outstandingFromSchedule = $sale->payments()->whereIn('status', ['unpaid', 'partial', 'overdue'])->sum('amount');
+        $paidSum = $sale->payments()->where('status', 'paid')->sum('amount');
+        if ($outstandingFromSchedule > 0) {
+            $sale->outstanding_amount = $outstandingFromSchedule;
+            $sale->paid_amount = max(0, $sale->price - $outstandingFromSchedule);
+        } else {
+            $sale->paid_amount = min($sale->price, $paidSum);
+            $sale->outstanding_amount = max(0, $sale->price - $sale->paid_amount);
+        }
+        $sale->status = $sale->outstanding_amount <= 0 ? 'paid_off' : 'active';
+        $sale->save();
+    }
+}
 
 
 

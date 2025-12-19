@@ -1,9 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="page-heading" style="align-items:center; gap:12px; flex-wrap:wrap;">
+    <div class="page-heading" style="margin-bottom:24px; gap:12px; flex-wrap:wrap;">
         <div>
-            <h2 class="text-xl font-bold text-text-main tracking-tight">Kavling</h2>
+            <h2 style="font-size:20px; font-weight:700; color:#1E293B; margin:0;">Kavling</h2>
+            <p style="font-size:12px; color:#64748B; margin:4px 0 0 0;">Kelola data unit kavling</p>
         </div>
         <div
             style="flex:1; min-width:260px; display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap;">
@@ -61,12 +62,14 @@
                         <td style="padding-left:14px; white-space: nowrap;">
                             <a href="{{ route('kavling.edit', $lot) }}" class="btn"
                                 style="padding:8px 10px; border-color:#e5e7eb;">Edit</a>
-                            <form action="{{ route('kavling.destroy', $lot) }}" method="POST" style="display:inline;">
+                            <form action="{{ route('kavling.destroy', $lot) }}" method="POST" style="display:inline;"
+                                class="lot-delete-form" data-confirm="Hapus kavling ini?">
                                 @csrf
                                 @method('DELETE')
                                 <button class="btn"
-                                    style="padding:8px 10px; border-color:#e5e7eb; color:#b4232a; margin-left:6px;"
-                                    onclick="return confirm('Hapus kavling ini?')">Delete</button>
+                                    style="padding:8px 10px; border-color:#e5e7eb; color:#b4232a; margin-left:6px; cursor:pointer !important;">
+                                    Hapus
+                                </button>
                             </form>
                         </td>
                     </tr>
@@ -93,6 +96,14 @@
             const suggestionsBox = document.getElementById('lotSuggestions');
             const rows = Array.from(document.querySelectorAll('[data-lot-row]'));
             const labels = @json($lotLabels);
+            const toast = document.getElementById('toast');
+
+            const showToast = (message) => {
+                if (!toast || !message) return;
+                toast.textContent = message;
+                toast.classList.add('active');
+                setTimeout(() => toast.classList.remove('active'), 4000);
+            };
 
             const renderSuggestions = (query) => {
                 suggestionsBox.innerHTML = '';
@@ -156,6 +167,62 @@
                 if (!suggestionsBox.contains(e.target) && e.target !== searchInput) {
                     suggestionsBox.style.display = 'none';
                 }
+            });
+
+            const removeRow = (row) => {
+                row?.remove();
+                const tbody = document.getElementById('lotsTableBody');
+                const remaining = tbody?.querySelectorAll('[data-lot-row]')?.length || 0;
+                if (remaining === 0) {
+                    if (!document.getElementById('lots-empty')) {
+                        const emptyRow = document.createElement('tr');
+                        emptyRow.id = 'lots-empty';
+                        emptyRow.innerHTML = '<td colspan="7" style="text-align:center; padding:18px; color:#6b7280;">Belum ada data</td>';
+                        tbody?.appendChild(emptyRow);
+                    }
+                }
+            };
+
+            document.querySelectorAll('.lot-delete-form').forEach((form) => {
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const message = form.dataset.confirm || 'Hapus data ini?';
+                    if (!confirm(message)) return;
+
+                    const submitBtn = form.querySelector('button[type="submit"], button');
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                    }
+
+                    const formData = new FormData(form);
+                    const token = formData.get('_token');
+
+                    try {
+                        const response = await fetch(form.action, {
+                            method: 'POST',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': token,
+                                'Accept': 'application/json',
+                            },
+                            body: formData,
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Gagal menghapus kavling.');
+                        }
+
+                        const row = form.closest('[data-lot-row]');
+                        removeRow(row);
+                        showToast('Kavling dihapus');
+                    } catch (err) {
+                        showToast('Gagal menghapus kavling');
+                        if (submitBtn) submitBtn.disabled = false;
+                        return;
+                    }
+
+                    if (submitBtn) submitBtn.disabled = false;
+                });
             });
         })();
     </script>
