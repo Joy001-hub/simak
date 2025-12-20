@@ -37,6 +37,13 @@ class PenjualanController extends Controller
             $sale->lot?->update(['status' => 'available']);
         } elseif ($type === 'refund') {
             $amount = (int) str_replace('.', '', $request->input('refund_amount', 0));
+
+            // Strict Accounting Fix: Before marking as refund, ensure paid_amount is ONLY what was actually paid.
+            // This fixes legacy KPR data where paid_amount might be inflated (Price).
+            $realPaid = $sale->payments()->where('status', 'paid')->sum('amount');
+            $sale->paid_amount = $realPaid;
+            $sale->outstanding_amount = 0; // No more debt for canceled item
+
             $sale->status = Sale::STATUS_CANCELED_REFUND;
             $sale->refund_amount = $amount;
             $sale->save();
@@ -123,9 +130,21 @@ class PenjualanController extends Controller
         }
         if ($filters['status_dp'] !== 'Semua') {
             if ($filters['status_dp'] === 'Lunas') {
-                $query->where('down_payment', '>', 0);
+                // DP Lunas: has down_payment > 0 AND DP payment is paid
+                $query->where('down_payment', '>', 0)
+                    ->whereHas('payments', function ($q) {
+                        $q->where('note', 'Down Payment')->where('status', 'paid');
+                    });
             } elseif ($filters['status_dp'] === 'Belum') {
-                $query->where('down_payment', '<=', 0);
+                // DP Belum: has down_payment > 0 AND (DP payment is unpaid OR no DP payment record)
+                $query->where('down_payment', '>', 0)
+                    ->where(function ($q) {
+                        $q->whereHas('payments', function ($q2) {
+                            $q2->where('note', 'Down Payment')->where('status', '!=', 'paid');
+                        })->orWhereDoesntHave('payments', function ($q2) {
+                            $q2->where('note', 'Down Payment');
+                        });
+                    });
             }
         }
         if ($filters['tgl_booking_dari']) {
@@ -210,8 +229,14 @@ class PenjualanController extends Controller
     {
         $sale = Sale::with(['lot.project', 'buyer', 'marketer', 'payments'])->findOrFail($id);
         $companyProfile = CompanyProfile::first();
-        $invoiceFormat = optional($companyProfile)->invoice_format ?? 'INV/{YYYY}/{MM}/{####}';
-        $receiptFormat = optional($companyProfile)->receipt_format ?? 'KW/{YYYY}/{MM}/{####}';
+
+        // Check if company profile is configured
+        if (!$companyProfile || !$companyProfile->name) {
+            return redirect()->route('profile.index')->with('error', 'Silahkan isi Profil Perusahaan terlebih dahulu sebelum memulai.');
+        }
+
+        $invoiceFormat = $companyProfile->invoice_format ?? 'INV/{YYYY}/{MM}/{####}';
+        $receiptFormat = $companyProfile->receipt_format ?? 'KW/{YYYY}/{MM}/{####}';
         $booking = $sale->booking_date ?? now();
         $invoiceNumber = $this->formatDocumentNumber($invoiceFormat, $sale, $booking);
         $receiptNumber = $this->formatDocumentNumber($receiptFormat, $sale, $booking);
@@ -333,7 +358,7 @@ class PenjualanController extends Controller
                 ]);
             } else {
                 // DP exists - create unpaid DP record
-                $data['paid_amount'] = 0; // DP belum dibayar
+                $data['paid_amount'] = max(0, $netPrice - $dp); // Bank portion assumed paid
                 $data['outstanding_amount'] = $dp; // Hanya DP yang jadi piutang
                 $data['status'] = 'active';
 
@@ -395,13 +420,15 @@ class PenjualanController extends Controller
         $data['down_payment'] = $dp;
         $data['tenor_months'] = $tenor;
         $data['due_day'] = $dueDay;
-        $data['paid_amount'] = min($netPrice, $dp);
-        $data['outstanding_amount'] = max(0, $netPrice - $data['paid_amount']);
-        $data['status'] = $data['outstanding_amount'] > 0 ? 'active' : 'paid_off';
+        // Initial state: Paid 0, Outstanding Full Price (DP + Installments)
+        // syncDownPaymentHistory will adjust if DP is actually paid later (but usually starts unpaid)
+        $data['paid_amount'] = 0;
+        $data['outstanding_amount'] = $netPrice;
+        $data['status'] = 'active';
 
         $sale = Sale::create($data);
-        $this->syncDownPaymentHistory($sale);
-        $this->rebuildSchedule($sale);
+        $this->rebuildSchedule($sale);      // Build Installments first
+        $this->syncDownPaymentHistory($sale); // Then Calculate Totals
 
         // Update lot status to 'sold'
         if ($sale->lot) {
@@ -442,10 +469,8 @@ class PenjualanController extends Controller
         // Set common data
         $data['price'] = $netPrice;
 
-        // Handle Cash Keras & KPR Bank - full payment, no DP, no tenor, no outstanding
-        if (in_array($data['payment_method'], ['cash', 'kpr'])) {
-            $paymentLabel = $data['payment_method'] === 'cash' ? 'Cash Keras' : 'KPR Bank';
-
+        // Handle Cash Keras - full payment
+        if ($data['payment_method'] === 'cash') {
             $data['down_payment'] = 0;
             $data['tenor_months'] = 0;
             $data['due_day'] = null;
@@ -455,15 +480,54 @@ class PenjualanController extends Controller
 
             $penjualan->update($data);
 
-            // Delete all existing payments and create single payment
             $penjualan->payments()->delete();
             $penjualan->payments()->create([
                 'due_date' => $penjualan->booking_date ?? now(),
                 'amount' => $netPrice,
                 'status' => 'paid',
-                'note' => "Pembayaran Penuh ({$paymentLabel})",
+                'note' => "Pembayaran Penuh (Cash Keras)",
                 'paid_at' => $penjualan->booking_date ?? now(),
             ]);
+
+            return redirect()->route('penjualan.index')->with('success', 'Penjualan diperbarui');
+        }
+
+        // Handle KPR Bank
+        if ($data['payment_method'] === 'kpr') {
+            $dpPercent = (float) ($data['dp_percent'] ?? 0);
+            $dpInput = (int) ($data['down_payment'] ?? 0);
+            $dp = $dpInput > 0 ? $dpInput : (int) round($netPrice * ($dpPercent / 100));
+
+            $data['down_payment'] = $dp;
+            $data['tenor_months'] = 0;
+            $data['due_day'] = null;
+
+            if ($dp <= 0) {
+                // No DP - Full Payment
+                $data['paid_amount'] = $netPrice;
+                $data['outstanding_amount'] = 0;
+                $data['status'] = 'paid_off';
+                $penjualan->update($data);
+
+                $penjualan->payments()->delete();
+                $penjualan->payments()->create([
+                    'due_date' => $penjualan->booking_date ?? now(),
+                    'amount' => $netPrice,
+                    'status' => 'paid',
+                    'note' => "Pembayaran Penuh (KPR Bank)",
+                    'paid_at' => $penjualan->booking_date ?? now(),
+                ]);
+            } else {
+                // DP Exists
+                $data['paid_amount'] = max(0, $netPrice - $dp);
+                $data['outstanding_amount'] = $dp;
+                $data['status'] = 'active';
+
+                $penjualan->update($data);
+
+                // Sync/Update DP Payment
+                $this->syncDownPaymentHistory($penjualan);
+            }
 
             return redirect()->route('penjualan.index')->with('success', 'Penjualan diperbarui');
         }
@@ -519,8 +583,8 @@ class PenjualanController extends Controller
         $data['status'] = $outstanding > 0 ? 'active' : 'paid_off';
 
         $penjualan->update($data);
-        $this->syncDownPaymentHistory($penjualan);
-        $this->rebuildSchedule($penjualan);
+        $this->rebuildSchedule($penjualan);      // Build/Update Installments first
+        $this->syncDownPaymentHistory($penjualan); // Then Recalculate Totals based on new structure
 
         return redirect()->route('penjualan.index')->with('success', 'Penjualan diperbarui');
     }
@@ -531,27 +595,51 @@ class PenjualanController extends Controller
     }
     private function rebuildSchedule(Sale $sale): void
     {
-        $outstanding = max(0, (int) $sale->outstanding_amount);
-        if ($outstanding <= 0 || ($sale->tenor_months ?? 0) <= 0) {
-            $sale->payments()->where('status', 'unpaid')->delete();
+        // Calculate amount that needs to be covered by installments
+        // Total Price - DP - Already Paid Installments
+
+        $price = (int) $sale->price;
+        $dp = (int) $sale->down_payment;
+        $paidInstallments = $sale->payments()
+            ->where('status', 'paid')
+            ->where(function ($q) {
+                $q->whereNull('note')->orWhere('note', 'like', 'Angsuran%');
+            })->sum('amount');
+
+        // The remaining principal to be split into FUTURE installments
+        $outstandingForSchedule = max(0, $price - $dp - $paidInstallments);
+
+        if ($outstandingForSchedule <= 0 || ($sale->tenor_months ?? 0) <= 0) {
+            $sale->payments()->where('status', 'unpaid')->where('note', 'like', 'Angsuran%')->delete();
             return;
         }
+
         $paid = $sale->payments()->where('status', 'paid')->where(function ($q) {
             $q->whereNull('note')->orWhere('note', 'like', 'Angsuran%');
         })->orderBy('due_date')->get();
         $paidCount = $paid->count();
         $remainingTenor = max(1, (int) $sale->tenor_months - $paidCount);
+
         $baseDate = $paid->last()?->due_date ?? ($sale->booking_date ?? Carbon::now());
         $day = max(1, min(28, (int) ($sale->due_day ?? ($baseDate instanceof Carbon ? $baseDate->day : 1))));
         $startDate = ($baseDate instanceof Carbon ? $baseDate->copy() : Carbon::parse($baseDate ?? now()))->day($day);
+
+        // Logic for start date: if first installment, start next month? Or same month?
+        // Usually if booking date is today, first installment is next month.
         if ($paid->last()) {
             $startDate->addMonth();
-        } elseif ($startDate->lessThan(Carbon::now()->day($day))) {
+        } else {
+            // First installment
             $startDate->addMonth();
         }
-        $sale->payments()->where('status', 'unpaid')->delete();
-        $perTerm = intdiv($outstanding, $remainingTenor);
-        $remainder = $outstanding - ($perTerm * $remainingTenor);
+
+        // Only delete UNPAID installments to regenerate them
+        $sale->payments()->where('status', 'unpaid')->where(function ($q) {
+            $q->where('note', 'like', 'Angsuran%')->orWhereNull('note');
+        })->delete();
+
+        $perTerm = intdiv($outstandingForSchedule, $remainingTenor);
+        $remainder = $outstandingForSchedule - ($perTerm * $remainingTenor);
         for ($i = 0; $i < $remainingTenor; $i++) {
             $amount = $perTerm + ($i < $remainder ? 1 : 0);
             $dueDate = $startDate->copy()->addMonths($i);
@@ -586,15 +674,72 @@ class PenjualanController extends Controller
         }
         $outstandingFromSchedule = $sale->payments()->whereIn('status', ['unpaid', 'partial', 'overdue'])->sum('amount');
         $paidSum = $sale->payments()->where('status', 'paid')->sum('amount');
-        if ($outstandingFromSchedule > 0) {
-            $sale->outstanding_amount = $outstandingFromSchedule;
-            $sale->paid_amount = max(0, $sale->price - $outstandingFromSchedule);
+
+        // Strict Accounting for ALL types (Cash, KPR, In-house)
+        // Paid = What is in the payment records.
+        // Outstanding = Price - Paid.
+
+        $sale->paid_amount = min($sale->price, $paidSum);
+        $sale->outstanding_amount = max(0, $sale->price - $sale->paid_amount);
+
+        // Status Determination
+        if ($sale->outstanding_amount <= 0) {
+            $sale->status = 'paid_off';
         } else {
-            $sale->paid_amount = min($sale->price, $paidSum);
-            $sale->outstanding_amount = max(0, $sale->price - $sale->paid_amount);
+            // For KPR, even if Outstanding > 0 (Bank portion), we might want to flag it specially?
+            // Current logic: If Outstanding > 0 -> Active.
+            // But verify manual override isn't overwritten? 
+            // Actually, if we use strict accounting, 'paid_off' ONLY happens if paid >= price.
+            // So if Bank hasn't paid, it MUST be active.
+
+            if ($sale->status === 'paid_off') {
+                // If it was marked paid_off but math says otherwise, revert to active?
+                // Exception: Maybe slight rounding errors? Ignoring for now.
+                $sale->status = 'active';
+            }
+
+            // Allow manual 'active' status for specific workflows if needed, 
+            // but generally logic dictates status.
+            // However, keep existing status if it is not 'paid_off' to preserve specific canceled statuses?
+            if (!in_array($sale->status, ['canceled', Sale::STATUS_CANCELED_HAPUS, Sale::STATUS_CANCELED_REFUND, Sale::STATUS_CANCELED_OPER_KREDIT])) {
+                $sale->status = 'active';
+            }
         }
-        $sale->status = $sale->outstanding_amount <= 0 ? 'paid_off' : 'active';
+
         $sale->save();
+    }
+
+    public function approveKpr(Sale $sale)
+    {
+        if ($sale->payment_method !== 'kpr') {
+            return back()->with('error', 'Hanya untuk penjualan KPR');
+        }
+
+        // Refresh model to ensure we have latest state
+        $sale->refresh();
+
+        // Calculate actual paid amount from transactions
+        $totalPaid = $sale->payments()->where('status', 'paid')->sum('amount');
+
+        // Use price from model
+        $price = $sale->price;
+
+        $remaining = max(0, $price - $totalPaid);
+
+        if ($remaining > 0) {
+            $sale->payments()->create([
+                'due_date' => now(),
+                'amount' => $remaining,
+                'status' => 'paid',
+                'note' => 'Pencairan KPR Bank',
+                'paid_at' => now(),
+            ]);
+        }
+
+        // Recalculate totals
+        $this->syncDownPaymentHistory($sale);
+
+        return back()->with('success', 'KPR Disetujui. Pembayaran Bank tercatat.');
     }
 }
 

@@ -60,7 +60,7 @@ class PaymentController extends Controller
                 $toAllocate = min($remainingAmount, $installmentAmount);
 
                 if ($toAllocate >= $installmentAmount) {
-                    $installment->status = 'paid';
+                    $installment->status = 'distributed'; // Mark as distributed so it doesn't double-count in history
                     $installment->paid_at = $paymentDate;
                     $installment->save();
                 } else {
@@ -138,7 +138,13 @@ class PaymentController extends Controller
             ? 0
             : (int) ($sale->down_payment ?? 0);
 
-        if ($outstandingFromSchedule > 0) {
+        if ($sale->payment_method === 'kpr') {
+            // For KPR, the "Bank Portion" is not in payments table but is considered paid.
+            // So Paid Amount = Price - Outstanding (DP).
+            // If outstandingFromSchedule (unpaid DP) is 0, then Paid Amount = Price.
+            $sale->outstanding_amount = $outstandingFromSchedule;
+            $sale->paid_amount = max(0, $sale->price - $outstandingFromSchedule);
+        } elseif ($outstandingFromSchedule > 0) {
             $sale->outstanding_amount = $outstandingFromSchedule;
             $sale->paid_amount = max(0, $sale->price - $outstandingFromSchedule);
         } else {
@@ -148,7 +154,18 @@ class PaymentController extends Controller
             $sale->outstanding_amount = max(0, $sale->price - $sale->paid_amount);
         }
 
-        $sale->status = $sale->outstanding_amount <= 0 ? 'paid_off' : 'active';
+        // Determine Status
+        if ($sale->outstanding_amount <= 0) {
+            // If KPR, only set paid_off if it was ALREADY paid_off (manual approval).
+            // Otherwise keep it active until manually approved.
+            if ($sale->payment_method === 'kpr' && $sale->status !== 'paid_off') {
+                $sale->status = 'active';
+            } else {
+                $sale->status = 'paid_off';
+            }
+        } else {
+            $sale->status = 'active';
+        }
         $sale->save();
     }
 

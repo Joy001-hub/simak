@@ -65,6 +65,7 @@ class DataManagementController extends Controller
             'marketers' => Marketer::all(),
             'sales' => Sale::all(),
             'payments' => Payment::all(),
+            'company_profile' => CompanyProfile::first(),
         ];
 
         $json = json_encode($payload, JSON_PRETTY_PRINT);
@@ -140,21 +141,21 @@ class DataManagementController extends Controller
                 // Support both old format (kavling_id) and new format (lot_id)
                 $lotIdKey = $s['lot_id'] ?? $s['kavling_id'] ?? null;
                 $lotId = $lotMap[$lotIdKey] ?? null;
-                
+
                 // Support both old format (customer_id) and new format (buyer_id)
                 $buyerIdKey = $s['buyer_id'] ?? $s['customer_id'] ?? null;
                 $buyerId = $buyerMap[$buyerIdKey] ?? null;
-                
+
                 // Support both old format (sales_id) and new format (marketer_id)
                 $marketerIdKey = $s['marketer_id'] ?? $s['sales_id'] ?? null;
                 $marketerId = $marketerMap[$marketerIdKey] ?? null;
-                
+
                 // Skip sale if lot_id is null (required field)
                 if (!$lotId) {
                     logger()->warning('[Restore] Skipping sale with invalid lot_id', ['sale_data' => $s]);
                     continue;
                 }
-                
+
                 $price = $s['price'] ?? $s['grand_total'] ?? $s['harga_netto'] ?? 0;
                 $dp = $s['down_payment'] ?? $s['dp_terbayar'] ?? $s['uang_muka_rp'] ?? 0;
                 $tenor = $s['tenor_months'] ?? $s['tenor'] ?? 0;
@@ -164,7 +165,7 @@ class DataManagementController extends Controller
                 $status = $s['status'] ?? 'active';
                 $paidAmount = $s['paid_amount'] ?? 0;
                 $outstandingAmount = $s['outstanding_amount'] ?? $price;
-                
+
                 $sale = Sale::create([
                     'lot_id' => $lotId,
                     'buyer_id' => $buyerId,
@@ -230,6 +231,25 @@ class DataManagementController extends Controller
                 $sale->outstanding_amount = max(0, $sale->price - $sale->paid_amount);
                 $sale->status = $sale->outstanding_amount <= 0 ? 'paid_off' : 'active';
                 $sale->save();
+            }
+            // Restore Company Profile
+            if (isset($data['company_profile'])) {
+                $cpData = $data['company_profile'];
+                // Since resetData truncated it, we create a new one
+                CompanyProfile::create([
+                    'name' => $cpData['name'] ?? 'Perusahaan Properti',
+                    'npwp' => $cpData['npwp'] ?? null,
+                    'email' => $cpData['email'] ?? null,
+                    'phone' => $cpData['phone'] ?? null,
+                    'address' => $cpData['address'] ?? null,
+                    'signer_name' => $cpData['signer_name'] ?? 'Admin Keuangan',
+                    'footer_note' => $cpData['footer_note'] ?? 'Terima kasih atas pembayaran Anda.',
+                    'invoice_format' => $cpData['invoice_format'] ?? 'INV/{YYYY}/{MM}/{####}',
+                    'receipt_format' => $cpData['receipt_format'] ?? 'KW/{YYYY}/{MM}/{####}',
+                    'logo_path' => $cpData['logo_path'] ?? null,
+                ]);
+            } else {
+                $this->seedDefaultCompanyProfile();
             }
         });
 
@@ -449,7 +469,8 @@ class DataManagementController extends Controller
                             $isPaid = rand(1, 100) <= 85;
                             $status = $isPaid ? 'paid' : 'unpaid';
                             $paidAt = $isPaid ? $dueDate->format('Y-m-d') : null;
-                            if ($isPaid) $paidAmount += $amount;
+                            if ($isPaid)
+                                $paidAmount += $amount;
                         } else {
                             $status = 'unpaid';
                             $paidAt = null;
@@ -545,16 +566,16 @@ class DataManagementController extends Controller
             $lotIdKey = $s['lot_id'] ?? $s['kavling_id'] ?? null;
             $buyerIdKey = $s['buyer_id'] ?? $s['customer_id'] ?? null;
             $marketerIdKey = $s['marketer_id'] ?? $s['sales_id'] ?? null;
-            
+
             $lotId = $lotMap[$lotIdKey] ?? null;
             $buyerId = $buyerMap[$buyerIdKey] ?? null;
             $marketerId = $marketerMap[$marketerIdKey] ?? null;
-            
+
             // Skip if lot_id is null (required field)
             if (!$lotId) {
                 continue;
             }
-            
+
             $price = $s['price'] ?? $s['grand_total'] ?? $s['harga_netto'] ?? 0;
             $dp = $s['down_payment'] ?? $s['dp_terbayar'] ?? $s['uang_muka_rp'] ?? 0;
             $tenor = $s['tenor_months'] ?? $s['tenor'] ?? 0;
@@ -564,7 +585,7 @@ class DataManagementController extends Controller
             $paidAmount = $s['paid_amount'] ?? 0;
             $outstandingAmount = $s['outstanding_amount'] ?? $price;
             $status = $s['status'] ?? 'active';
-            
+
             $sale = Sale::create([
                 'lot_id' => $lotId,
                 'buyer_id' => $buyerId,

@@ -10,6 +10,7 @@
 
 
 
+
     <form id="companyForm" action="{{ route('profile.update') }}" method="POST" enctype="multipart/form-data">
         @csrf
         <div class="card"

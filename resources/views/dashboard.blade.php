@@ -771,14 +771,7 @@
                     },
                     plugins: {
                         legend: {
-                            display: true,
-                            labels: {
-                                color: '#1E293B',
-                                boxWidth: 14,
-                                boxHeight: 14,
-                                usePointStyle: true,
-                                filter: (item) => item.datasetIndex === 0 // Only show first dataset (Nilai Rp)
-                            }
+                            display: false
                         },
                         tooltip: {
                             callbacks: {

@@ -94,28 +94,55 @@
                 <input class="input" type="number" name="area" min="0" required>
             </div>
             <div class="field">
-                <label class="hint">Harga Dasar (Rp) <span style="color:red">*</span></label>
-                <input class="input" type="number" name="base_price" min="0" required>
+                <div class="field">
+                    <label class="hint">Harga Dasar (Rp) <span style="color:red">*</span></label>
+                    <input class="input currency-input" type="text" name="base_price" min="0" required
+                        value="{{ old('base_price') ? number_format((float) str_replace('.', '', old('base_price')), 0, ',', '.') : '' }}">
+                </div>
             </div>
-        </div>
 
-        <div class="field">
-            <label class="hint">Status</label>
-            <select class="input" name="status">
-                <option value="available">Available</option>
-                <option value="sold">Sold</option>
-                <option value="reserved">Reserved</option>
-                <option value="active">Active</option>
-            </select>
-        </div>
+            <div class="field">
+                <label class="hint">Status</label>
+                <select class="input" name="status">
+                    <option value="available">Available</option>
+                    <option value="sold">Sold</option>
+                    <option value="reserved">Reserved</option>
+                    <option value="active">Active</option>
+                </select>
+            </div>
 
-        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:10px;">
-            <a class="btn light" href="{{ route('kavling.index') }}">Batal</a>
-            <button class="btn primary" type="submit">Simpan</button>
-        </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:10px;">
+                <a class="btn light" href="{{ route('kavling.index') }}">Batal</a>
+                <button class="btn primary" type="submit">Simpan</button>
+            </div>
     </form>
 
     <script>
+        // Currency Formatting Logic
+        document.querySelectorAll('.currency-input').forEach(input => {
+            input.addEventListener('input', function (e) {
+                let cursorPosition = this.selectionStart;
+                let oldLength = this.value.length;
+
+                let val = this.value.replace(/\D/g, '');
+                if (val !== '') {
+                    this.value = Number(val).toLocaleString('id-ID');
+                } else {
+                    this.value = '';
+                }
+
+                let newLength = this.value.length;
+                cursorPosition = cursorPosition + (newLength - oldLength);
+                this.setSelectionRange(cursorPosition, cursorPosition);
+            });
+        });
+
+        document.querySelector('form').addEventListener('submit', function (e) {
+            document.querySelectorAll('.currency-input').forEach(input => {
+                input.value = input.value.replace(/\./g, '');
+            });
+        });
+
         const btnSingle = document.getElementById('btnSingle');
         const btnBulk = document.getElementById('btnBulk');
         const inputMode = document.getElementById('inputMode');

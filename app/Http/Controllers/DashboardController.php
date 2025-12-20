@@ -125,10 +125,42 @@ class DashboardController extends Controller
         $comparisonMeta = ['enabled' => $compareEnabled, 'label' => $compareLabel, 'range' => $compareEnabled ? [$compareFrom?->toDateString(), $compareTo?->toDateString()] : null, 'reason' => $canCompare ? null : 'Periode tidak bisa dibandingkan',];
         $canceledStatuses = ['canceled', Sale::STATUS_CANCELED_HAPUS, Sale::STATUS_CANCELED_REFUND, Sale::STATUS_CANCELED_OPER_KREDIT,];
         $activeSales = $sales->whereNotIn('status', $canceledStatuses);
+
+        // Helper to calculate only PAID Down Payments
+        $calculatePaidDP = function ($salesCollection) {
+            return $salesCollection->flatMap(function ($sale) {
+                return $sale->payments->filter(function ($payment) {
+                    $note = $payment->note ?? '';
+                    // Check for "Down Payment" or "Down Payment (100%)"
+                    return \Illuminate\Support\Str::startsWith($note, 'Down Payment') && $payment->status === 'paid';
+                });
+            })->sum('amount');
+        };
+
+        // Helper to calculate Net Paid amount (Active + Refunded Net)
+        // Helper to calculate Net Paid amount (Active + Refunded Net)
+        $calculateNetPaid = function ($salesAll, $activeSalesOnly) {
+            // Updated Logic: 'paid_amount' in DB is now trustworthy (Strict Accounting).
+            $activeSum = $activeSalesOnly->sum('paid_amount');
+
+            // Add Net Revenue from Refunded Sales (Paid - Refunded)
+            $refundedSales = $salesAll->where('status', Sale::STATUS_CANCELED_REFUND);
+            $refundedNet = $refundedSales->sum(function ($sale) {
+                // Technically also 'paid_amount' - refund if strictly updated, but let's be safe slightly
+                return max(0, ((int) $sale->paid_amount) - ((int) $sale->refund_amount));
+            });
+
+            return $activeSum + $refundedNet;
+        };
+
         $totalPenjualan = $activeSales->count();
         $totalHarga = $activeSales->sum('price');
-        $totalDP = $activeSales->sum('down_payment');
-        $totalPaid = $activeSales->sum('paid_amount');
+        // $totalDP = $activeSales->sum('down_payment'); // OLD logic
+        $totalDP = $calculatePaidDP($activeSales);      // NEW logic: check paid status
+
+        // $totalPaid = $activeSales->sum('paid_amount'); // OLD
+        $totalPaid = $calculateNetPaid($sales, $activeSales); // NEW: Include refunded net
+
         $canceledSales = $sales->whereIn('status', ['canceled', Sale::STATUS_CANCELED_HAPUS, Sale::STATUS_CANCELED_REFUND]);
         $canceledCount = $canceledSales->count();
         $canceledValue = $canceledSales->sum('price');
@@ -190,7 +222,14 @@ class DashboardController extends Controller
             return ['delta' => $delta, 'direction' => $diff >= 0 ? 'up' : 'down',];
         };
         $activeComparisonSales = $compareEnabled ? $comparisonSales->whereNotIn('status', $canceledStatuses) : collect();
-        $previousTotals = $compareEnabled ? ['paid' => $activeComparisonSales->sum('paid_amount'), 'dp' => $activeComparisonSales->sum('down_payment'), 'count' => $activeComparisonSales->count(), 'price' => $activeComparisonSales->sum('price'), 'outstanding' => $activeComparisonSales->sum('outstanding_amount'),] : null;
+        $previousTotals = $compareEnabled ? [
+            // 'paid' => $activeComparisonSales->sum('paid_amount'), // OLD
+            'paid' => $calculateNetPaid($comparisonSales, $activeComparisonSales), // NEW
+            'dp' => $calculatePaidDP($activeComparisonSales),
+            'count' => $activeComparisonSales->count(),
+            'price' => $activeComparisonSales->sum('price'),
+            'outstanding' => $activeComparisonSales->sum('outstanding_amount'),
+        ] : null;
         $summary = [
             ['label' => 'Penerimaan Periode Ini', 'value' => $totalPaid, 'previous' => $previousTotals['paid'] ?? null, 'trend' => $compareEnabled ? $trendCalc($totalPaid, $previousTotals['paid'] ?? null) : null, 'hint' => $totalPenjualan ? "dari {$totalPenjualan} transaksi" : 'Belum ada data',],
             ['label' => 'Total DP Diterima', 'value' => $totalDP, 'previous' => $previousTotals['dp'] ?? null, 'trend' => $compareEnabled ? $trendCalc($totalDP, $previousTotals['dp'] ?? null) : null, 'hint' => $totalPenjualan ? "dari {$totalPenjualan} penjualan" : 'Belum ada data',],

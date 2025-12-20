@@ -117,6 +117,22 @@
                     </div>
                     @endif
                 @endif
+
+                @if($sale->payment_method === 'kpr' && $sale->status === 'active' && ($penjualan['dp_status'] === 'paid' || $penjualan['dp_amount'] == 0))
+                <div style="margin-top:16px; border-top:1px solid #e5e7eb; padding-top:12px;">
+                    <h4 style="font-size:14px; font-weight:600; color:#1f2937; margin-bottom:8px;">Konfirmasi Status KPR</h4>
+                    <div style="background:#f0fdf4; padding:12px; border-radius:8px; border:1px solid #bef264;">
+                        <p style="font-size:13px; color:#166534; margin-bottom:10px;">DP telah lunas. Apakah pengajuan KPR nasabah ini lolos/disetujui oleh Bank?</p>
+                        <div style="display:flex; gap:10px;">
+                            <form action="{{ route('penjualan.approveKpr', $sale) }}" method="POST">
+                                @csrf
+                                <button type="button" onclick="this.closest('form').submit()" class="btn success" style="padding:6px 16px; font-size:13px; background:#22c55e; color:white; border:none; cursor:pointer; border-radius:6px;">Ya, KPR Lolos</button>
+                            </form>
+                            <button type="button" class="btn" style="padding:6px 16px; font-size:13px; background:#fff; color:#dc2626; border:1px solid #dc2626; cursor:pointer; border-radius:6px;" onclick="openKprRejectModal()">Tidak (Batalkan)</button>
+                        </div>
+                    </div>
+                </div>
+                @endif
             </div>
         </div>
 
@@ -148,12 +164,12 @@
                                     <td>{{ optional($payment->due_date)->format('d M Y') }}</td>
                                     <td>Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
                                     <td>
-                                        <span class="status-chip {{ $payment->status === 'paid' ? 'success' : ($payment->status === 'partial' ? 'warning' : 'info') }}" style="{{ $payment->status === 'partial' ? 'background:#fef3c7; color:#92400e;' : '' }}">
-                                            {{ $payment->status }}
+                                        <span class="status-chip {{ in_array($payment->status, ['paid', 'distributed']) ? 'success' : ($payment->status === 'partial' ? 'warning' : 'info') }}" style="{{ $payment->status === 'partial' ? 'background:#fef3c7; color:#92400e;' : '' }}">
+                                            {{ in_array($payment->status, ['paid', 'distributed']) ? 'Lunas' : ucfirst($payment->status) }}
                                         </span>
                                     </td>
                                     <td style="text-align:right; white-space:nowrap;">
-                                        @if ($payment->status !== 'paid')
+                                        @if (!in_array($payment->status, ['paid', 'distributed']))
                                             <form action="{{ route('payments.update', $payment) }}" method="POST" style="display:inline;">
                                                 @csrf
                                                 @method('PATCH')
@@ -177,25 +193,35 @@
 
                 <div style="margin-top:12px; border-top:1px solid #e5e7eb; padding-top:12px;">
                     <h4 class="panel-title" style="padding:0 0 8px 0;">Pembayaran Fleksibel</h4>
-                    <form action="{{ route('payments.store') }}" method="POST" style="display:flex; flex-direction:column; gap:8px;">
-                        @csrf
-                        <input type="hidden" name="sale_id" value="{{ $sale->id }}">
-                        <div class="grid-2" style="column-gap:12px;">
-                            <div class="field">
-                                <label class="hint">Nominal (Rp)</label>
-                                <input class="input" type="number" name="amount" min="1" placeholder="Masukkan nominal">
+                    @if(isset($penjualan['dp_status']) && $penjualan['dp_status'] === 'unpaid')
+                        <div style="background:#fef2f2; border:1px solid #fecaca; padding:12px; border-radius:8px; color:#b91c1c; font-size:13px;">
+                            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; font-weight:600;">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                Akses Dibatasi
+                            </div>
+                            Pembayaran fleksibel hanya dapat dilakukan setelah Down Payment (DP) lunas. Silakan selesaikan pembayaran DP di kotak ringkasan finansial di atas.
+                        </div>
+                    @else
+                        <form action="{{ route('payments.store') }}" method="POST" style="display:flex; flex-direction:column; gap:8px;">
+                            @csrf
+                            <input type="hidden" name="sale_id" value="{{ $sale->id }}">
+                            <div class="grid-2" style="column-gap:12px;">
+                                <div class="field">
+                                    <label class="hint">Nominal (Rp)</label>
+                                    <input class="input currency-input" type="text" name="amount" min="1" placeholder="Masukkan nominal" required>
+                                </div>
+                                <div class="field">
+                                    <label class="hint">Tanggal</label>
+                                    <input class="input" type="date" name="date" value="{{ now()->format('Y-m-d') }}">
+                                </div>
                             </div>
                             <div class="field">
-                                <label class="hint">Tanggal</label>
-                                <input class="input" type="date" name="date" value="{{ now()->format('Y-m-d') }}">
+                                <label class="hint">Catatan</label>
+                                <input class="input" type="text" name="note" placeholder="Pembayaran Fleksibel">
                             </div>
-                        </div>
-                        <div class="field">
-                            <label class="hint">Catatan</label>
-                            <input class="input" type="text" name="note" placeholder="Pembayaran Fleksibel">
-                        </div>
-                        <button type="submit" class="btn primary" style="align-self:flex-end;">Simpan Pembayaran</button>
-                    </form>
+                            <button type="submit" class="btn primary" style="align-self:flex-end;">Simpan Pembayaran</button>
+                        </form>
+                    @endif
                 </div>
             </div>
 
@@ -292,6 +318,41 @@
         </div>
     </div>
     @include('penjualan.cancel_modal')
+
+    <!-- Dedicated KPR Rejection Modal -->
+    <div id="kprRejectModal" class="modal-backdrop">
+        <div class="modal-card" style="max-width: 480px; padding: 28px;">
+            <div class="modal-header" style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+                <div style="width: 44px; height: 44px; background: #fef2f2; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                </div>
+                <div>
+                    <h2 style="margin: 0; font-size: 18px; font-weight: 700; color: #111827;">Tolak Pengajuan KPR</h2>
+                    <p style="margin: 0; font-size: 13px; color: #6b7280;">Batalkan penjualan dan refund dana ke konsumen.</p>
+                </div>
+            </div>
+
+            <form action="{{ route('penjualan.cancel', $sale) }}" method="POST">
+                @csrf
+                <input type="hidden" name="type" value="refund">
+                
+                <div class="cancel-extra-field" style="display:block; margin-top:0;">
+                    <label class="hint">Nominal Refund (Rp)</label>
+                    <input type="text" name="refund_amount" class="input currency-input" placeholder="Masukkan nominal refund" required>
+                    <p style="font-size:12px; color:#6b7280; margin-top:6px;">Masukkan jumlah uang yang dikembalikan ke konsumen (setelah potongan).</p>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn light" id="closeKprRejectModal">Batal</button>
+                    <button type="submit" class="btn danger">Proses Refund & Batalkan</button>
+                </div>
+            </form>
+        </div>
+    </div>
 @endsection
 
 @push('scripts')
@@ -299,11 +360,23 @@
         const cancelBtn = document.getElementById('cancelSaleBtn');
         const cancelModal = document.getElementById('cancelModal');
         const closeCancel = document.getElementById('closeCancelModal');
-        const cancelForm = document.getElementById('cancelForm');
+        const typeRadios = document.getElementsByName('type');
         const refundInput = document.getElementById('refundInput');
         const operKreditInput = document.getElementById('operKreditInput');
         const newBuyerSelect = document.getElementById('newBuyerSelect');
-        const typeRadios = document.getElementsByName('type');
+
+        // Dedicated KPR Reject Modal Elements
+        const kprRejectModal = document.getElementById('kprRejectModal');
+        const closeKprReject = document.getElementById('closeKprRejectModal');
+
+        // Define function globally first
+        window.openKprRejectModal = function() {
+             if(kprRejectModal) {
+                 kprRejectModal.classList.add('active');
+             } else {
+                 console.error('KPR Modal not found! ID: kprRejectModal');
+             }
+        };
 
         if(cancelBtn) {
             cancelBtn.addEventListener('click', () => {
@@ -316,31 +389,37 @@
             typeRadios.forEach(radio => {
                 radio.addEventListener('change', (e) => {
                     // Hide all extra fields first
-                    refundInput.classList.add('hidden');
-                    operKreditInput.classList.add('hidden');
-                    newBuyerSelect.removeAttribute('required');
+                    if(refundInput) refundInput.classList.add('hidden');
+                    if(operKreditInput) operKreditInput.classList.add('hidden');
+                    if(newBuyerSelect) newBuyerSelect.removeAttribute('required');
                     
                     // Show relevant field based on selection
                     if(e.target.value === 'refund') {
-                        refundInput.classList.remove('hidden');
+                        if(refundInput) refundInput.classList.remove('hidden');
                     } else if(e.target.value === 'oper_kredit') {
-                        operKreditInput.classList.remove('hidden');
-                        newBuyerSelect.setAttribute('required', 'required');
-                    }
-                });
-            });
-
-            // Currency formatter
-            const currencyInputs = document.querySelectorAll('.currency-input');
-            currencyInputs.forEach(input => {
-                input.addEventListener('input', (e) => {
-                    let val = e.target.value.replace(/\D/g, '');
-                    if (val) {
-                        e.target.value = new Intl.NumberFormat('id-ID').format(val);
+                        if(operKreditInput) operKreditInput.classList.remove('hidden');
+                        if(newBuyerSelect) newBuyerSelect.setAttribute('required', 'required');
                     }
                 });
             });
         }
+
+        if(closeKprReject) {
+            closeKprReject.addEventListener('click', () => {
+                kprRejectModal.classList.remove('active');
+            });
+        }
+
+        // Currency formatter
+        const currencyInputs = document.querySelectorAll('.currency-input');
+        currencyInputs.forEach(input => {
+            input.addEventListener('input', (e) => {
+                let val = e.target.value.replace(/\D/g, '');
+                if (val) {
+                    e.target.value = new Intl.NumberFormat('id-ID').format(val);
+                }
+            });
+        });
 
         // Notes inline edit
         const editNotesBtn = document.getElementById('editNotesBtn');
