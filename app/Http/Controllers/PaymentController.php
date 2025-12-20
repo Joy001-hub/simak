@@ -98,9 +98,6 @@ class PaymentController extends Controller
             $message .= ' Kelebihan Rp ' . number_format($overpayAmount, 0, ',', '.') . ' dicatat.';
         }
 
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
-
         return redirect()
             ->route('penjualan.show', $sale)
             ->with('success', $message);
@@ -117,9 +114,6 @@ class PaymentController extends Controller
 
         $sale = $payment->sale;
         $this->recalculateSale($sale);
-
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
 
         return redirect()
             ->route('penjualan.show', $sale)

@@ -10,12 +10,12 @@
     <form action="{{ route('projects.store') }}" method="POST" class="card" style="max-width:600px; gap:10px;">
         @csrf
         <div class="field">
-            <label class="hint">Nama Project</label>
+            <label class="hint">Nama Project <span style="color:red">*</span></label>
             <input class="input" type="text" name="name" required>
         </div>
         <div class="field">
-            <label class="hint">Lokasi</label>
-            <input class="input" type="text" name="location">
+            <label class="hint">Lokasi <span style="color:red">*</span></label>
+            <input class="input" type="text" name="location" required>
         </div>
         <div class="field">
             <label class="hint">Catatan</label>
@@ -23,7 +23,7 @@
         </div>
         <div class="field">
             <label class="hint">Total Unit</label>
-            <input class="input" type="number" name="total_units" min="0" value="0">
+            <input class="input" type="number" name="total_units" min="0" placeholder="0">
         </div>
         <div style="display:flex; gap:10px; justify-content:flex-end;">
             <a class="btn light" href="{{ route('projects.index') }}">Batal</a>

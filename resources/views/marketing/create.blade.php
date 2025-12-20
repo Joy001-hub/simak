@@ -10,7 +10,7 @@
     <form action="{{ route('marketing.store') }}" method="POST" class="card" style="max-width:500px; gap:10px;">
         @csrf
         <div class="field">
-            <label class="hint">Nama</label>
+            <label class="hint">Nama <span style="color:red">*</span></label>
             <input class="input" type="text" name="name" required>
         </div>
         <div class="field">

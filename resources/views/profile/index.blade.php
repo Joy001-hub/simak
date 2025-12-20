@@ -17,25 +17,26 @@
             <h3 class="panel-title" style="padding:0 0 6px 0;">Informasi Dasar</h3>
             <div class="grid-2" style="column-gap:18px; row-gap:12px;">
                 <div class="field">
-                    <label class="hint">Nama Perusahaan</label>
-                    <input class="input sm" type="text" name="name" value="{{ old('name', $company?->name) }}">
+                    <label class="hint">Nama Perusahaan <span style="color:red">*</span></label>
+                    <input class="input sm" type="text" name="name" value="{{ old('name', $company?->name) }}" required>
                 </div>
                 <div class="field">
-                    <label class="hint">NPWP</label>
-                    <input class="input sm" type="text" name="npwp" value="{{ old('npwp', $company?->npwp) }}">
+                    <label class="hint">NPWP <span style="color:red">*</span></label>
+                    <input class="input sm" type="text" name="npwp" value="{{ old('npwp', $company?->npwp) }}" required>
                 </div>
                 <div class="field">
-                    <label class="hint">Email</label>
-                    <input class="input sm" type="email" name="email" value="{{ old('email', $company?->email) }}">
+                    <label class="hint">Email <span style="color:red">*</span></label>
+                    <input class="input sm" type="email" name="email" value="{{ old('email', $company?->email) }}" required>
                 </div>
                 <div class="field">
-                    <label class="hint">Telepon</label>
-                    <input class="input sm" type="text" name="phone" value="{{ old('phone', $company?->phone) }}">
+                    <label class="hint">Telepon <span style="color:red">*</span></label>
+                    <input class="input sm" type="text" name="phone" value="{{ old('phone', $company?->phone) }}" required>
                 </div>
             </div>
             <div class="field">
-                <label class="hint">Alamat</label>
-                <textarea class="input sm" name="address" rows="2">{{ old('address', $company?->address) }}</textarea>
+                <label class="hint">Alamat <span style="color:red">*</span></label>
+                <textarea class="input sm" name="address" rows="2"
+                    required>{{ old('address', $company?->address) }}</textarea>
             </div>
 
             <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 4px 0 4px;">
@@ -75,14 +76,14 @@
 
             <div class="grid-2" style="column-gap:18px;">
                 <div class="field">
-                    <label class="hint">Nama Tanda Tangan Admin</label>
+                    <label class="hint">Nama Tanda Tangan Admin <span style="color:red">*</span></label>
                     <input class="input sm" type="text" name="signer_name"
-                        value="{{ old('signer_name', $company?->signer_name) }}">
+                        value="{{ old('signer_name', $company?->signer_name) }}" required>
                 </div>
                 <div class="field">
-                    <label class="hint">Catatan Kaki Cetakan</label>
+                    <label class="hint">Catatan Kaki Cetakan <span style="color:red">*</span></label>
                     <input class="input sm" type="text" name="footer_note"
-                        value="{{ old('footer_note', $company?->footer_note) }}">
+                        value="{{ old('footer_note', $company?->footer_note) }}" required>
                 </div>
             </div>
 
@@ -92,14 +93,14 @@
                 urut (4 digit).</p>
             <div class="grid-2" style="column-gap:18px; row-gap:12px;">
                 <div class="field">
-                    <label class="hint">Format Faktur</label>
+                    <label class="hint">Format Faktur <span style="color:red">*</span></label>
                     <input class="input sm" type="text" name="invoice_format"
-                        value="{{ old('invoice_format', $company?->invoice_format) }}">
+                        value="{{ old('invoice_format', $company?->invoice_format ?? 'INV/{YYYY}{MM}/{####}') }}" required>
                 </div>
                 <div class="field">
-                    <label class="hint">Format Kwitansi</label>
+                    <label class="hint">Format Kwitansi <span style="color:red">*</span></label>
                     <input class="input sm" type="text" name="receipt_format"
-                        value="{{ old('receipt_format', $company?->receipt_format) }}">
+                        value="{{ old('receipt_format', $company?->receipt_format ?? 'KW/{YYYY}{MM}/{####}') }}" required>
                 </div>
             </div>
             <div style="display:flex; justify-content:flex-end; margin-top:6px;">

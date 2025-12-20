@@ -9,8 +9,6 @@ class DashboardController extends Controller
 {
     public function index(Request $request)
     {
-        // Reset dashboard updates counter when user views dashboard
-        session()->forget('dashboard_updates');
         $periodOptions = ['Minggu Ini', 'Bulan Ini', 'Tahun Ini', 'Tahun Lalu', 'Semua'];
         $activePeriod = $request->query('periode', 'Tahun Ini');
         $dateFrom = null;

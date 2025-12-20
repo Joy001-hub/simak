@@ -35,16 +35,12 @@ class PenjualanController extends Controller
             $sale->status = Sale::STATUS_CANCELED_HAPUS;
             $sale->save();
             $sale->lot?->update(['status' => 'available']);
-            // Increment dashboard updates counter
-            session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         } elseif ($type === 'refund') {
             $amount = (int) str_replace('.', '', $request->input('refund_amount', 0));
             $sale->status = Sale::STATUS_CANCELED_REFUND;
             $sale->refund_amount = $amount;
             $sale->save();
             $sale->lot?->update(['status' => 'available']);
-            // Increment dashboard updates counter
-            session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         } elseif ($type === 'oper_kredit') {
             $newBuyerId = $request->input('new_buyer_id');
             $newMarketerId = $request->input('new_marketer_id');
@@ -55,8 +51,6 @@ class PenjualanController extends Controller
                 $sale->marketer_id = $newMarketerId;
             }
             $sale->save();
-            // Increment dashboard updates counter
-            session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
             return redirect()->route('penjualan.show', $sale)->with('success', "Oper kredit berhasil! Pembeli diubah dari {$oldBuyerName} ke pembeli baru.");
         }
         return back()->with('success', 'Penjualan berhasil dibatalkan');
@@ -179,10 +173,17 @@ class PenjualanController extends Controller
                 $statusLabel = 'Batal (Refund)';
             elseif ($sale->status === Sale::STATUS_CANCELED_OPER_KREDIT)
                 $statusLabel = 'Oper Kredit';
-            // Status DP: Cash Keras & KPR Bank langsung Lunas (tidak ada konsep DP)
-            $statusDp = in_array($sale->payment_method, ['cash', 'kpr'])
-                ? 'Lunas'
-                : ($sale->down_payment > 0 ? 'Lunas' : 'Belum');
+            // Status DP: check actual DP payment status
+            $dpPayment = $sale->payments->where('note', 'Down Payment')->first();
+            if ($sale->payment_method === 'cash') {
+                $statusDp = 'N/A';  // Cash Keras tidak ada DP
+            } elseif ($sale->down_payment <= 0) {
+                $statusDp = 'N/A';  // Tidak ada DP
+            } elseif ($dpPayment && $dpPayment->status === 'paid') {
+                $statusDp = 'Lunas';
+            } else {
+                $statusDp = 'Belum';
+            }
             return ['id' => $sale->id, 'kavling' => optional($sale->lot)->project?->name . ' / ' . optional($sale->lot)->block_number, 'pembeli' => optional($sale->buyer)->name, 'buyer_phone' => optional($sale->buyer)->phone, 'tgl_booking' => optional($sale->booking_date)?->format('d M Y'), 'tgl_booking_ts' => $bookingTs, 'metode_bayar' => $sale->payment_method === 'cash' ? 'Cash Keras' : ($sale->payment_method === 'kpr' ? 'KPR Bank' : 'Angsuran In-house'), 'harga_jual' => $sale->price, 'sisa_piutang' => $sale->outstanding_amount, 'status_dp' => $statusDp, 'status' => $statusLabel, 'estimasi_lunas' => $estimasiDate?->format('M Y'), 'estimasi_ts' => $estimasiTs, 'status_value' => $statusVal, 'marketing' => optional($sale->marketer)->name, 'status_color' => $statusColor, 'status_tagihan' => $statusTagihan,];
         })->toArray();
         $sortBy = $filters['sort_by'];
@@ -214,6 +215,14 @@ class PenjualanController extends Controller
         $booking = $sale->booking_date ?? now();
         $invoiceNumber = $this->formatDocumentNumber($invoiceFormat, $sale, $booking);
         $receiptNumber = $this->formatDocumentNumber($receiptFormat, $sale, $booking);
+
+        // Calculate DP status
+        $dpAmount = (int) ($sale->down_payment ?? 0);
+        $dpPayment = $sale->payments->where('note', 'Down Payment')->first();
+        $dpPaid = $dpPayment && $dpPayment->status === 'paid' ? $dpPayment->amount : 0;
+        $dpRemaining = max(0, $dpAmount - $dpPaid);
+        $dpStatus = $dpAmount > 0 ? ($dpRemaining > 0 ? 'unpaid' : 'paid') : null;
+
         $penjualan = [
             'id' => $sale->id,
             'invoice' => $invoiceNumber,
@@ -228,6 +237,11 @@ class PenjualanController extends Controller
             'sisa_piutang' => $sale->outstanding_amount,
             'tenor' => $sale->tenor_months,
             'tgl_jatuh_tempo' => $sale->due_day,
+            'dp_amount' => $dpAmount,
+            'dp_paid' => $dpPaid,
+            'dp_remaining' => $dpRemaining,
+            'dp_status' => $dpStatus,
+            'dp_payment_id' => $dpPayment?->id,
             'company' => ['nama' => $companyProfile->name ?? 'Nama Perusahaan', 'alamat' => $companyProfile->address ?? 'Alamat Belum Diatur', 'telepon' => $companyProfile->phone ?? '-', 'email' => $companyProfile->email ?? '-', 'logo_url' => $companyProfile->logo_path ? asset('storage/' . $companyProfile->logo_path) : null,],
             'schedule' => $sale->payments->map(function ($p) {
                 return ['no' => $p->id, 'jatuh_tempo' => optional($p->due_date)?->format('d M Y'), 'jumlah' => $p->amount, 'status' => $p->status,];
@@ -263,11 +277,8 @@ class PenjualanController extends Controller
         // Set common data
         $data['price'] = $netPrice;
 
-        // Handle Cash Keras & KPR Bank - full payment, no DP, no tenor, no outstanding
-        // Both are treated as immediate full payment to developer
-        if (in_array($data['payment_method'], ['cash', 'kpr'])) {
-            $paymentLabel = $data['payment_method'] === 'cash' ? 'Cash Keras' : 'KPR Bank';
-
+        // Handle Cash Keras - full payment, no DP, no tenor, no outstanding
+        if ($data['payment_method'] === 'cash') {
             $data['down_payment'] = 0;
             $data['tenor_months'] = 0;
             $data['due_day'] = null;
@@ -282,9 +293,61 @@ class PenjualanController extends Controller
                 'due_date' => $sale->booking_date ?? now(),
                 'amount' => $netPrice,
                 'status' => 'paid',
-                'note' => "Pembayaran Penuh ({$paymentLabel})",
+                'note' => "Pembayaran Penuh (Cash Keras)",
                 'paid_at' => $sale->booking_date ?? now(),
             ]);
+
+            // Update lot status to 'sold'
+            if ($sale->lot) {
+                $sale->lot->update(['status' => 'sold']);
+            }
+
+            return redirect()->route('penjualan.index')->with('success', 'Penjualan ditambahkan');
+        }
+
+        // Handle KPR Bank - full payment to developer, but allow optional DP (belum lunas)
+        if ($data['payment_method'] === 'kpr') {
+            $dpPercent = (float) ($data['dp_percent'] ?? 0);
+            $dpInput = (int) ($data['down_payment'] ?? 0);
+            $dp = $dpInput > 0 ? $dpInput : (int) round($netPrice * ($dpPercent / 100));
+
+            $data['down_payment'] = $dp;
+            $data['tenor_months'] = 0;
+            $data['due_day'] = null;
+
+            // If no DP, treat as full payment
+            if ($dp <= 0) {
+                $data['paid_amount'] = $netPrice;
+                $data['outstanding_amount'] = 0;
+                $data['status'] = 'paid_off';
+
+                $sale = Sale::create($data);
+
+                // Create single payment record
+                $sale->payments()->create([
+                    'due_date' => $sale->booking_date ?? now(),
+                    'amount' => $netPrice,
+                    'status' => 'paid',
+                    'note' => "Pembayaran Penuh (KPR Bank)",
+                    'paid_at' => $sale->booking_date ?? now(),
+                ]);
+            } else {
+                // DP exists - create unpaid DP record
+                $data['paid_amount'] = 0; // DP belum dibayar
+                $data['outstanding_amount'] = $dp; // Hanya DP yang jadi piutang
+                $data['status'] = 'active';
+
+                $sale = Sale::create($data);
+
+                // Create DP payment with unpaid status
+                $sale->payments()->create([
+                    'due_date' => $sale->booking_date ?? now(),
+                    'amount' => $dp,
+                    'status' => 'unpaid',
+                    'note' => 'Down Payment',
+                    'paid_at' => null,
+                ]);
+            }
 
             // Update lot status to 'sold'
             if ($sale->lot) {
@@ -345,16 +408,11 @@ class PenjualanController extends Controller
             $sale->lot->update(['status' => 'sold']);
         }
 
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
-
         return redirect()->route('penjualan.index')->with('success', 'Penjualan ditambahkan');
     }
     public function destroy(Sale $penjualan)
     {
         $penjualan->delete();
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         return redirect()->route('penjualan.index')->with('success', 'Penjualan dihapus');
     }
     public function edit(Sale $penjualan)
@@ -464,9 +522,6 @@ class PenjualanController extends Controller
         $this->syncDownPaymentHistory($penjualan);
         $this->rebuildSchedule($penjualan);
 
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
-
         return redirect()->route('penjualan.index')->with('success', 'Penjualan diperbarui');
     }
     private function formatDocumentNumber(string $format, Sale $sale, Carbon $date): string
@@ -509,9 +564,22 @@ class PenjualanController extends Controller
         $dpPayment = $sale->payments()->where('note', 'Down Payment')->first();
         if ($dpAmount > 0) {
             if (!$dpPayment) {
-                $dpPayment = $sale->payments()->create(['due_date' => $sale->booking_date ?? now(), 'amount' => $dpAmount, 'status' => 'paid', 'note' => 'Down Payment', 'paid_at' => $sale->booking_date ?? now(),]);
+                // Create DP payment with 'unpaid' status - user must pay separately
+                $dpPayment = $sale->payments()->create([
+                    'due_date' => $sale->booking_date ?? now(),
+                    'amount' => $dpAmount,
+                    'status' => 'unpaid',  // Initially unpaid
+                    'note' => 'Down Payment',
+                    'paid_at' => null,
+                ]);
             } else {
-                $dpPayment->update(['amount' => $dpAmount, 'status' => 'paid', 'due_date' => $sale->booking_date ?? $dpPayment->due_date ?? now(), 'paid_at' => $dpPayment->paid_at ?? ($sale->booking_date ?? now()), 'note' => 'Down Payment',]);
+                // Preserve existing status when updating amount
+                $dpPayment->update([
+                    'amount' => $dpAmount,
+                    'due_date' => $sale->booking_date ?? $dpPayment->due_date ?? now(),
+                    'note' => 'Down Payment',
+                    // Keep existing status and paid_at  
+                ]);
             }
         } elseif ($dpPayment) {
             $dpPayment->delete();

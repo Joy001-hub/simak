@@ -61,33 +61,12 @@
 
             <nav class="nav">
                 <a class="nav-item {{ request()->routeIs('dashboard') ? 'active' : '' }}"
-                    href="{{ route('dashboard') }}" style="position: relative;">
+                    href="{{ route('dashboard') }}">
                     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
                         <path
                             d="M4 11.5 12 4l8 7.5V20a1 1 0 0 1-1 1h-4.5a.5.5 0 0 1-.5-.5v-4a1 1 0 0 0-1-1h-3a1 1 0 0 0-1 1v4a.5.5 0 0 1-.5.5H5a1 1 0 0 1-1-1v-8.5Z" />
                     </svg>
                     <span class="label">Dashboard</span>
-                    @php $dashboardUpdates = session('dashboard_updates', 0); @endphp
-                    @if($dashboardUpdates > 0)
-                        <span style="
-                                                position: absolute;
-                                                right: 12px;
-                                                top: 50%;
-                                                transform: translateY(-50%);
-                                                background: #ef4444;
-                                                color: white;
-                                                font-size: 11px;
-                                                font-weight: 700;
-                                                min-width: 20px;
-                                                height: 20px;
-                                                border-radius: 10px;
-                                                display: inline-flex;
-                                                align-items: center;
-                                                justify-content: center;
-                                                padding: 0 6px;
-                                                box-shadow: 0 2px 4px rgba(239,68,68,0.4);
-                                            ">{{ $dashboardUpdates > 99 ? '99+' : $dashboardUpdates }}</span>
-                    @endif
                 </a>
                 <a class="nav-item {{ request()->routeIs('penjualan.*') ? 'active' : '' }}"
                     href="{{ route('penjualan.index') }}">
@@ -190,83 +169,6 @@
 
         <div class="content-area">
             <main class="page" style="padding-bottom: 80px;">
-                @if($errors->any())
-                    <div id="errorToast" style="
-                                                position: fixed;
-                                                top: 24px;
-                                                right: 24px;
-                                                z-index: 9999;
-                                                min-width: 320px;
-                                                max-width: 420px;
-                                                background: linear-gradient(135deg, #fff 0%, #fef2f2 100%);
-                                                border-radius: 12px;
-                                                box-shadow: 0 20px 40px rgba(0,0,0,0.15), 0 8px 16px rgba(239,68,68,0.1);
-                                                border: 1px solid rgba(239,68,68,0.2);
-                                                overflow: hidden;
-                                                animation: slideIn 0.4s ease-out;
-                                            ">
-                        <div style="
-                                                    display: flex;
-                                                    align-items: center;
-                                                    gap: 12px;
-                                                    padding: 16px 20px;
-                                                    background: linear-gradient(90deg, #ef4444, #dc2626);
-                                                    color: white;
-                                                ">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2.5">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="12" y1="8" x2="12" y2="12" />
-                                <line x1="12" y1="16" x2="12.01" y2="16" />
-                            </svg>
-                            <span style="font-weight: 600; font-size: 14px;">Terdapat kesalahan pada input</span>
-                            <button onclick="document.getElementById('errorToast').style.display='none'" style="
-                                                        margin-left: auto;
-                                                        background: rgba(255,255,255,0.2);
-                                                        border: none;
-                                                        border-radius: 6px;
-                                                        width: 28px;
-                                                        height: 28px;
-                                                        cursor: pointer;
-                                                        display: flex;
-                                                        align-items: center;
-                                                        justify-content: center;
-                                                        transition: background 0.2s;
-                                                    " onmouseover="this.style.background='rgba(255,255,255,0.3)'"
-                                onmouseout="this.style.background='rgba(255,255,255,0.2)'">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white"
-                                    stroke-width="2.5">
-                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                    <line x1="6" y1="6" x2="18" y2="18" />
-                                </svg>
-                            </button>
-                        </div>
-                        <ul style="
-                                                    margin: 0;
-                                                    padding: 16px 20px 16px 36px;
-                                                    color: #991b1b;
-                                                    font-size: 13px;
-                                                    line-height: 1.6;
-                                                ">
-                            @foreach($errors->all() as $error)
-                                <li style="margin-bottom: 4px;">{{ $error }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
-                    <style>
-                        @keyframes slideIn {
-                            from {
-                                transform: translateX(100%);
-                                opacity: 0;
-                            }
-
-                            to {
-                                transform: translateX(0);
-                                opacity: 1;
-                            }
-                        }
-                    </style>
-                @endif
                 @yield('content')
             </main>
             <footer
@@ -704,6 +606,19 @@
             });
         })();
     </script>
+
+    <style>
+        .input-error {
+            border-color: #dc2626 !important;
+            background-color: #fef2f2 !important;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1) !important;
+        }
+
+        .input-error:focus {
+            border-color: #dc2626 !important;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2) !important;
+        }
+    </style>
 
     {{-- Include Maintenance Modal Component --}}
     @include('components.maintenance-modal')
@@ -1195,6 +1110,75 @@
     </script>
 
     @stack('scripts')
+
+    {{-- Form Validation Script - runs after all page scripts --}}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('form').forEach(form => {
+                form.addEventListener('submit', function (e) {
+                    // Remove previous error messages
+                    form.querySelectorAll('.field-error').forEach(el => el.remove());
+                    form.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+
+                    let firstInvalid = null;
+
+                    // Check all required fields (only visible ones)
+                    form.querySelectorAll('[required]').forEach(input => {
+                        // Skip if input or its container is hidden
+                        const isHidden = input.offsetParent === null ||
+                            input.closest('[style*="display: none"]') ||
+                            input.closest('[style*="display:none"]');
+                        if (isHidden) return;
+
+                        const value = input.value.trim();
+                        const isSelect = input.tagName === 'SELECT';
+                        const isEmpty = isSelect ? (!value || value === '') : !value;
+
+                        if (isEmpty) {
+                            e.preventDefault();
+                            e.stopImmediatePropagation();
+                            input.classList.add('input-error');
+
+                            // Get label text
+                            const field = input.closest('.field');
+                            const label = field?.querySelector('label, .hint');
+                            let labelText = label?.textContent?.trim() || input.name || 'Field ini';
+                            // Remove asterisk from label
+                            labelText = labelText.replace(/\s*\*\s*$/g, '').replace(/\*/g, '').trim();
+
+                            // Create error message
+                            const errorMsg = document.createElement('div');
+                            errorMsg.className = 'field-error';
+                            errorMsg.style.cssText = 'color:#dc2626; font-size:12px; margin-top:4px; display:flex; align-items:center; gap:4px;';
+                            errorMsg.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg> ${labelText} harus diisi`;
+
+                            // Insert after input
+                            input.insertAdjacentElement('afterend', errorMsg);
+
+                            if (!firstInvalid) firstInvalid = input;
+                        }
+                    });
+
+                    // Scroll to first invalid field
+                    if (firstInvalid) {
+                        firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        firstInvalid.focus();
+                    }
+                });
+
+                // Remove error on input
+                form.addEventListener('input', function (e) {
+                    if (e.target.classList.contains('input-error')) {
+                        e.target.classList.remove('input-error');
+                        const nextError = e.target.nextElementSibling;
+                        if (nextError?.classList.contains('field-error')) {
+                            nextError.remove();
+                        }
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 
 </html>

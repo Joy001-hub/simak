@@ -88,6 +88,35 @@
                     <span class="hint">Sisa Piutang</span>
                     <span class="stat-value" style="font-size:18px; color:#b4232a;">Rp {{ number_format($penjualan['sisa_piutang'], 0, ',', '.') }}</span>
                 </div>
+                
+                @if($penjualan['dp_amount'] > 0)
+                    @if($penjualan['dp_status'] === 'unpaid')
+                    <div style="margin-top:12px; padding:14px 16px; background:#fef3c7; border-radius:10px; display:flex; flex-direction:column; align-items:center; gap:10px;">
+                        <span style="color:#92400e; font-size:14px;">Sisa DP belum lunas: <strong>Rp {{ number_format($penjualan['dp_remaining'], 0, ',', '.') }}</strong></span>
+                        @if($penjualan['dp_payment_id'])
+                        <form action="{{ route('payments.update', $penjualan['dp_payment_id']) }}" method="POST" style="display:inline;">
+                            @csrf
+                            @method('PATCH')
+                            <button type="submit" class="btn" style="background:#eab308; color:#fff; padding:8px 16px; border:none; border-radius:6px; font-weight:600; cursor:pointer;">Bayar Sisa DP</button>
+                        </form>
+                        @else
+                        <form action="{{ route('payments.store') }}" method="POST" style="display:inline;">
+                            @csrf
+                            <input type="hidden" name="sale_id" value="{{ $sale->id }}">
+                            <input type="hidden" name="amount" value="{{ $penjualan['dp_remaining'] }}">
+                            <input type="hidden" name="date" value="{{ now()->format('Y-m-d') }}">
+                            <input type="hidden" name="note" value="Down Payment">
+                            <button type="submit" class="btn" style="background:#eab308; color:#fff; padding:8px 16px; border:none; border-radius:6px; font-weight:600; cursor:pointer;">Bayar Sisa DP</button>
+                        </form>
+                        @endif
+                    </div>
+                    @else
+                    <div style="margin-top:12px; padding:14px 16px; background:#d1fae5; border-radius:10px; display:flex; flex-direction:column; align-items:center; gap:4px;">
+                        <span style="color:#166534; font-size:14px;">DP: <strong>Rp {{ number_format($penjualan['dp_amount'], 0, ',', '.') }}</strong></span>
+                        <span class="status-chip success" style="background:#22c55e; color:#fff; padding:4px 12px; border-radius:20px; font-size:12px;">Lunas</span>
+                    </div>
+                    @endif
+                @endif
             </div>
         </div>
 

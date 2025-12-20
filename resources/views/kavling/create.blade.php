@@ -32,7 +32,19 @@
         {{-- Single Mode Input --}}
         <div id="singleModeFields" class="field">
             <label class="hint">Blok/Number <span style="color:red">*</span></label>
-            <input class="input" type="text" name="block_number" id="singleBlockNumber" placeholder="Contoh: A 10">
+            <input class="input @error('block_number') input-error @enderror" type="text" name="block_number"
+                id="singleBlockNumber" placeholder="Contoh: A-10" required>
+            @error('block_number')
+                <div class="field-error"
+                    style="color:#dc2626; font-size:12px; margin-top:4px; display:flex; align-items:center; gap:4px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <circle cx="12" cy="16" r="1" fill="currentColor" />
+                    </svg>
+                    {{ $message }}
+                </div>
+            @enderror
         </div>
 
         {{-- Bulk Mode Inputs --}}
@@ -41,7 +53,7 @@
             <div class="grid-2" style="column-gap:10px;">
                 <div class="field">
                     <label class="hint">Blok Prefix <span style="color:red">*</span></label>
-                    <input class="input" type="text" name="bulk_prefix" placeholder="Contoh: A">
+                    <input class="input" type="text" name="bulk_prefix" placeholder="Contoh: A" id="bulkPrefixInput">
                 </div>
                 <div class="field">
                     <label class="hint">Suffix (Opsional)</label>
@@ -51,11 +63,23 @@
             <div class="grid-2" style="column-gap:10px;">
                 <div class="field">
                     <label class="hint">Mulai Angka <span style="color:red">*</span></label>
-                    <input class="input" type="number" name="bulk_start" min="1" placeholder="1">
+                    <input class="input" type="number" name="bulk_start" min="1" placeholder="1" id="bulkStartInput">
                 </div>
                 <div class="field">
                     <label class="hint">Sampai Angka <span style="color:red">*</span></label>
-                    <input class="input" type="number" name="bulk_end" min="1" placeholder="10">
+                    <input class="input @error('bulk_end') input-error @enderror" type="number" name="bulk_end" min="1"
+                        placeholder="10" id="bulkEndInput">
+                    @error('bulk_end')
+                        <div class="field-error"
+                            style="color:#dc2626; font-size:12px; margin-top:4px; display:flex; align-items:center; gap:4px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="12" y1="8" x2="12" y2="12" />
+                                <circle cx="12" cy="16" r="1" fill="currentColor" />
+                            </svg>
+                            {{ $message }}
+                        </div>
+                    @enderror
                 </div>
             </div>
             <p style="font-size:11px; color:#64748B; margin:0;">
@@ -66,12 +90,12 @@
 
         <div class="grid-2" style="column-gap:10px;">
             <div class="field">
-                <label class="hint">Luas (m²)</label>
-                <input class="input" type="number" name="area" min="0">
+                <label class="hint">Luas (m²) <span style="color:red">*</span></label>
+                <input class="input" type="number" name="area" min="0" required>
             </div>
             <div class="field">
-                <label class="hint">Harga Dasar (Rp)</label>
-                <input class="input" type="number" name="base_price" min="0">
+                <label class="hint">Harga Dasar (Rp) <span style="color:red">*</span></label>
+                <input class="input" type="number" name="base_price" min="0" required>
             </div>
         </div>
 
@@ -165,5 +189,11 @@
         [bulkPrefix, bulkSuffix, bulkStart, bulkEnd].forEach(el => {
             el.addEventListener('input', updatePreview);
         });
+
+        // Restore mode if there was an error (page reloaded with old input)
+        @if(old('mode') === 'bulk' || $errors->has('bulk_end'))
+            toggleMode('bulk');
+            updatePreview();
+        @endif
     </script>
 @endsection

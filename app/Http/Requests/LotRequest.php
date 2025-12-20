@@ -16,8 +16,8 @@ class LotRequest extends FormRequest
 
         $rules = [
             'project_id' => ['required', 'exists:projects,id'],
-            'area' => ['nullable', 'integer', 'min:0'],
-            'base_price' => ['nullable', 'integer', 'min:0'],
+            'area' => ['required', 'integer', 'min:0'],
+            'base_price' => ['required', 'integer', 'min:0'],
             'status' => ['required', 'in:available,sold,reserved,active'],
         ];
 

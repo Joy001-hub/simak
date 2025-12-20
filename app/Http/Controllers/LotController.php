@@ -23,12 +23,26 @@ class LotController extends Controller
 
     public function store(LotRequest $request)
     {
+        $projectId = $request->input('project_id');
+        $project = Project::findOrFail($projectId);
+        $currentLotCount = Lot::where('project_id', $projectId)->count();
+        $projectLimit = (int) ($project->total_units ?? 0);
+
         if ($request->input('mode') === 'bulk') {
             $prefix = $request->input('bulk_prefix');
             $start = (int) $request->input('bulk_start');
             $end = (int) $request->input('bulk_end');
             $suffix = $request->input('bulk_suffix');
-            $projectId = $request->input('project_id');
+
+            // Calculate how many lots will be created
+            $plannedCount = $end - $start + 1;
+
+            // Check if adding these lots would exceed project limit
+            if ($projectLimit > 0 && ($currentLotCount + $plannedCount) > $projectLimit) {
+                return back()->withErrors([
+                    'bulk_end' => "Limit {$projectLimit} unit"
+                ])->withInput();
+            }
 
             $created = 0;
             $skipped = 0;
@@ -38,6 +52,12 @@ class LotController extends Controller
             unset($commonData['bulk_prefix'], $commonData['bulk_start'], $commonData['bulk_end'], $commonData['bulk_suffix']);
 
             for ($i = $start; $i <= $end; $i++) {
+                // Check if we've hit the project limit
+                if ($projectLimit > 0 && ($currentLotCount + $created) >= $projectLimit) {
+                    $skipped += ($end - $i + 1);
+                    break;
+                }
+
                 // Format: "A-1", "A-2 B"
                 $blockNumber = trim($prefix . '-' . $i . ($suffix ? ' ' . $suffix : ''));
 
@@ -55,28 +75,28 @@ class LotController extends Controller
                 }
             }
 
-            // Increment dashboard updates counter by number of created lots
-            session(['dashboard_updates' => session('dashboard_updates', 0) + $created]);
-
             $msg = "{$created} kavling berhasil ditambahkan.";
             if ($skipped > 0) {
-                $msg .= " {$skipped} kavling dilewatkan karena duplikat.";
+                $msg .= " {$skipped} kavling dilewatkan karena duplikat atau melebihi limit.";
             }
 
             return redirect()->route('kavling.index')->with('success', $msg);
         }
 
-        // Single Mode
+        // Single Mode - Check if adding 1 lot would exceed project limit
+        if ($projectLimit > 0 && $currentLotCount >= $projectLimit) {
+            return back()->withErrors([
+                'block_number' => "Limit {$projectLimit} unit"
+            ])->withInput();
+        }
+
         Lot::create($request->validated());
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         return redirect()->route('kavling.index')->with('success', 'Kavling ditambahkan');
     }
 
     public function destroy(Lot $kavling, Request $request)
     {
         $kavling->delete();
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         if ($request->expectsJson()) {
             return response()->json(['message' => 'Kavling dihapus']);
         }
@@ -92,8 +112,6 @@ class LotController extends Controller
     public function update(LotRequest $request, Lot $kavling)
     {
         $kavling->update($request->validated());
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         return redirect()->route('kavling.index')->with('success', 'Kavling diperbarui');
     }
 

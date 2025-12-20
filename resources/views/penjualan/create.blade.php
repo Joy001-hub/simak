@@ -18,7 +18,7 @@
         <h3 class="panel-title">Data Utama</h3>
         <div class="grid-2" style="column-gap:18px;">
             <div class="field">
-                <label class="hint">Kavling (Tersedia)</label>
+                <label class="hint">Kavling (Tersedia) <span style="color:red">*</span></label>
                 <select name="lot_id" class="input" id="lotSelect" required>
                     <option value="">Pilih Kavling</option>
                     @foreach($lots as $lot)
@@ -30,7 +30,7 @@
                 </select>
             </div>
             <div class="field">
-                <label class="hint">Pelanggan</label>
+                <label class="hint">Pelanggan <span style="color:red">*</span></label>
                 <select name="buyer_id" class="input" required>
                     <option value="">Pilih Pelanggan</option>
                     @foreach($buyers as $buyer)
@@ -41,8 +41,8 @@
                 </select>
             </div>
             <div class="field">
-                <label class="hint">Sales</label>
-                <select name="marketer_id" class="input">
+                <label class="hint">Sales <span style="color:red">*</span></label>
+                <select name="marketer_id" class="input" required>
                     <option value="">Pilih Sales</option>
                     @foreach($marketers as $marketer)
                         <option value="{{ $marketer->id }}">{{ $marketer->name }}</option>
@@ -50,25 +50,26 @@
                 </select>
             </div>
             <div class="field">
-                <label class="hint">Metode Pembayaran</label>
-                <select name="payment_method" class="input" id="paymentMethod">
+                <label class="hint">Metode Pembayaran <span style="color:red">*</span></label>
+                <select name="payment_method" class="input" id="paymentMethod" required>
+                    <option value="">Pilih Metode Pembayaran</option>
                     <option value="cash">Cash Keras</option>
                     <option value="installment">Angsuran In-house</option>
                     <option value="kpr">KPR Bank</option>
                 </select>
             </div>
             <div class="field">
-                <label class="hint">Tgl Booking</label>
-                <input class="input" type="date" name="booking_date">
+                <label class="hint">Tgl Booking <span style="color:red">*</span></label>
+                <input class="input" type="date" name="booking_date" required>
             </div>
         </div>
 
         <h3 class="panel-title">Detail Harga</h3>
         <div class="grid-2" style="column-gap:18px;">
             <div class="field">
-                <label class="hint">Harga Dasar (Rp)</label>
+                <label class="hint">Harga Dasar (Rp) <span style="color:red">*</span></label>
                 <input class="input" type="number" name="base_price" id="basePrice" min="0"
-                    value="{{ old('base_price', '') }}" placeholder="Masukkan harga dasar">
+                    value="{{ old('base_price', '') }}" placeholder="Masukkan harga dasar" required>
             </div>
             <div class="field">
                 <label class="hint">Promo/Diskon (Rp)</label>
@@ -108,13 +109,13 @@
 
         <h3 class="panel-title">Skema Pembayaran</h3>
         <div class="grid-2" style="column-gap:18px;">
-            <div class="field">
-                <label class="hint">Tenor (bulan)</label>
+            <div class="field" id="tenorField">
+                <label class="hint">Tenor (bulan) <span class="req-mark" style="color:red">*</span></label>
                 <input class="input" type="number" name="tenor_months" id="tenorInput" min="0"
                     value="{{ old('tenor_months') ?: '' }}" placeholder="Misal: 12, 24, 36">
             </div>
-            <div class="field">
-                <label class="hint">Tanggal Jatuh Tempo (1-31)</label>
+            <div class="field" id="dueDayField">
+                <label class="hint">Tanggal Jatuh Tempo (1-31) <span class="req-mark" style="color:red">*</span></label>
                 <input class="input" type="number" name="due_day" id="dueDayInput" min="1" max="31"
                     value="{{ old('due_day', '') }}" placeholder="1 - 31">
             </div>
@@ -122,14 +123,18 @@
         <div class="grid-2" style="column-gap:18px;">
             <div class="field">
                 <label class="hint">Uang Muka (%)</label>
-                <input class="input" type="number" name="dp_percent" id="dpPercentInput" min="0" max="100"
-                    value="{{ old('dp_percent') ?: '' }}" placeholder="Misal: 10, 20, 30">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <input class="input" type="number" name="dp_percent" id="dpPercentInput" min="0" max="100" step="any"
+                        value="{{ old('dp_percent') ?: '' }}" placeholder="Misal: 10, 20, dst (opsional)" style="flex:1;">
+                    <span style="color:#64748B; font-size:13px; white-space:nowrap;">/ <strong id="dpRupiahDisplay">Rp
+                            0</strong></span>
+                </div>
+                <input type="hidden" name="down_payment" id="dpInput" value="{{ old('down_payment') ?: '' }}">
             </div>
             <div class="field">
-                <label class="hint">Uang Muka (Rp)</label>
-                <input class="input" type="number" name="down_payment" id="dpInput" min="0"
-                    value="{{ old('down_payment') ?: '' }}" placeholder="Masukkan nominal DP">
-                <small class="hint" id="dpPercent">0% dari harga</small>
+                <label class="hint">Booking Fee (Rp)</label>
+                <input class="input" type="number" name="booking_fee" id="bookingFeeInput" min="0"
+                    value="{{ old('booking_fee', '') }}" placeholder="Booking Fee (opsional)">
             </div>
         </div>
         <div class="field">
@@ -163,7 +168,7 @@
             const dpInput = document.getElementById('dpInput');
             const tenorInput = document.getElementById('tenorInput');
             const paymentMethod = document.getElementById('paymentMethod');
-            const dpPercentEl = document.getElementById('dpPercent');
+            const dpRupiahDisplay = document.getElementById('dpRupiahDisplay');
             const installmentEstimate = document.getElementById('installmentEstimate');
             const dueDayInput = document.getElementById('dueDayInput');
             const lotSelect = document.getElementById('lotSelect');
@@ -228,50 +233,63 @@
                 netPrice.value = net;
                 grandTotal.value = net;
 
-                // Handle Cash Keras & KPR Bank - disable tenor, due day, and DP fields
-                // Both are full payment to developer (no installments from developer's perspective)
-                const isFullPayment = paymentMethod.value === 'cash' || paymentMethod.value === 'kpr';
-                const paymentLabel = paymentMethod.value === 'cash' ? 'Cash Keras' : 'KPR Bank';
 
-                if (isFullPayment) {
+                // Handle Cash Keras - full payment, disable all installment fields
+                if (paymentMethod.value === 'cash') {
                     tenorInput.value = '';
                     tenorInput.disabled = true;
+                    tenorInput.removeAttribute('required');
                     dueDayInput.value = '';
                     dueDayInput.disabled = true;
+                    dueDayInput.removeAttribute('required');
                     dpPercentInput.value = '';
                     dpPercentInput.disabled = true;
                     dpInput.value = '';
-                    dpInput.disabled = true;
-                    dpPercentEl.textContent = `${paymentLabel} - pembayaran penuh`;
-                    installmentEstimate.value = `N/A (${paymentLabel})`;
-                    return; // No need to calculate DP/installments
+                    // Hide asterisks for tenor/due day
+                    document.querySelectorAll('#tenorField .req-mark, #dueDayField .req-mark').forEach(el => el.style.display = 'none');
+                    if (dpRupiahDisplay) dpRupiahDisplay.textContent = 'N/A (Cash Keras)';
+                    installmentEstimate.value = 'N/A (Cash Keras)';
+                    return;
                 }
 
-                // Re-enable fields for Installment only
+                // Handle KPR Bank - allow DP optional, disable tenor/due day
+                if (paymentMethod.value === 'kpr') {
+                    tenorInput.value = '';
+                    tenorInput.disabled = true;
+                    tenorInput.removeAttribute('required');
+                    dueDayInput.value = '';
+                    dueDayInput.disabled = true;
+                    dueDayInput.removeAttribute('required');
+                    // Hide asterisks for tenor/due day
+                    document.querySelectorAll('#tenorField .req-mark, #dueDayField .req-mark').forEach(el => el.style.display = 'none');
+                    installmentEstimate.value = 'N/A (KPR Bank)';
+                    // DP is optional for KPR
+                    dpPercentInput.disabled = false;
+                    const dpPercentVal = Number(dpPercentInput.value || 0);
+                    const dp = Math.max(0, Math.round(net * (dpPercentVal / 100)));
+                    dpInput.value = dp;
+                    if (dpRupiahDisplay) dpRupiahDisplay.textContent = formatIDR(dp);
+                    return;
+                }
+
+                // Re-enable all fields for Installment
                 tenorInput.disabled = false;
+                tenorInput.setAttribute('required', 'required');
                 dueDayInput.disabled = false;
+                dueDayInput.setAttribute('required', 'required');
                 dpPercentInput.disabled = false;
-                dpInput.disabled = false;
+                // Show asterisks for required fields
+                document.querySelectorAll('#tenorField .req-mark, #dueDayField .req-mark').forEach(el => el.style.display = 'inline');
 
+                // Calculate DP from percentage only
                 const dpPercentVal = Number(dpPercentInput.value || 0);
-                const dpInputVal = Number(dpInput.value || 0);
-                let dp = dpInputVal;
+                const dp = Math.max(0, Math.round(net * (dpPercentVal / 100)));
+                dpInput.value = dp;
 
-                if (window.lastDpChange === 'percent') {
-                    dp = Math.max(0, Math.round(net * (dpPercentVal / 100)));
-                    dpInput.value = dp;
-                } else if (window.lastDpChange === 'nominal') {
-                    const pct = net > 0 ? (dp / net) * 100 : 0;
-                    dpPercentInput.value = pct ? Number(pct.toFixed(2)) : 0;
-                } else {
-                    dp = dpInputVal || Math.round(net * (dpPercentVal / 100));
-                    dpInput.value = dp;
-                }
+                // Display rupiah value next to percentage input
+                if (dpRupiahDisplay) dpRupiahDisplay.textContent = formatIDR(dp);
+
                 const tenor = Number(tenorInput.value || 0);
-
-                const percent = net > 0 ? Math.round((dp / net) * 100) : 0;
-                dpPercentEl.textContent = `${percent}% dari harga`;
-
                 const outstanding = Math.max(0, net - dp);
                 const monthly = (tenor > 0 && paymentMethod.value === 'installment') ? Math.ceil(outstanding / tenor) : outstanding;
                 installmentEstimate.value = formatIDR(monthly);

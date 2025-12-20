@@ -125,8 +125,8 @@
         <div class="grid-2" style="column-gap:18px;">
             <div class="field">
                 <label class="hint">Uang Muka (%)</label>
-                <input class="input" type="number" name="dp_percent" id="dpPercentInput" min="0" max="100"
-                    value="{{ old('dp_percent') ?: '' }}" placeholder="Misal: 10, 20, 30">
+                <input class="input" type="number" name="dp_percent" id="dpPercentInput" min="0" max="100" step="any"
+                    value="{{ old('dp_percent') ?: '' }}" placeholder="Misal: 10, 20, dst (opsional)">
             </div>
             <div class="field">
                 <label class="hint">Uang Muka (Rp)</label>
@@ -225,12 +225,8 @@
                 netPrice.value = net;
                 grandTotal.value = net;
 
-                // Handle Cash Keras & KPR Bank - disable tenor, due day, and DP fields
-                // Both are full payment to developer (no installments from developer's perspective)
-                const isFullPayment = paymentMethod.value === 'cash' || paymentMethod.value === 'kpr';
-                const paymentLabel = paymentMethod.value === 'cash' ? 'Cash Keras' : 'KPR Bank';
-
-                if (isFullPayment) {
+                // Handle Cash Keras - full payment, disable all installment fields
+                if (paymentMethod.value === 'cash') {
                     tenorInput.value = '';
                     tenorInput.disabled = true;
                     dueDayInput.value = '';
@@ -239,12 +235,40 @@
                     dpPercentInput.disabled = true;
                     dpInput.value = '';
                     dpInput.disabled = true;
-                    dpPercentEl.textContent = `${paymentLabel} - pembayaran penuh`;
-                    installmentEstimate.value = `N/A (${paymentLabel})`;
-                    return; // No need to calculate DP/installments
+                    dpPercentEl.textContent = 'N/A (Cash Keras)';
+                    installmentEstimate.value = 'N/A (Cash Keras)';
+                    return;
                 }
 
-                // Re-enable fields for Installment only
+                // Handle KPR Bank - allow DP optional, disable tenor/due day
+                if (paymentMethod.value === 'kpr') {
+                    tenorInput.value = '';
+                    tenorInput.disabled = true;
+                    dueDayInput.value = '';
+                    dueDayInput.disabled = true;
+                    installmentEstimate.value = 'N/A (KPR Bank)';
+                    // DP is optional for KPR
+                    dpPercentInput.disabled = false;
+                    dpInput.disabled = false;
+                    const dpPercentVal = Number(dpPercentInput.value || 0);
+                    const dpInputVal = Number(dpInput.value || 0);
+                    let dp = dpInputVal;
+                    if (window.lastDpChange === 'percent') {
+                        dp = Math.max(0, Math.round(net * (dpPercentVal / 100)));
+                        dpInput.value = dp;
+                    } else if (window.lastDpChange === 'nominal') {
+                        const pct = net > 0 ? (dp / net) * 100 : 0;
+                        dpPercentInput.value = pct ? Number(pct.toFixed(2)) : 0;
+                    } else {
+                        dp = dpInputVal || Math.round(net * (dpPercentVal / 100));
+                        dpInput.value = dp;
+                    }
+                    const percent = net > 0 ? Math.round((dp / net) * 100) : 0;
+                    dpPercentEl.textContent = `${percent}% dari harga`;
+                    return;
+                }
+
+                // Re-enable all fields for Installment
                 tenorInput.disabled = false;
                 dueDayInput.disabled = false;
                 dpPercentInput.disabled = false;
