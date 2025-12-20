@@ -33,7 +33,7 @@
         </div>
         <div class="field">
             <label class="hint">Status</label>
-            <select class="input" name="status">
+            <select class="input" name="status" required>
                 <option value="available" @if($lot->status == 'available') selected @endif>Available</option>
                 <option value="sold" @if($lot->status == 'sold') selected @endif>Sold</option>
                 <option value="reserved" @if($lot->status == 'reserved') selected @endif>Reserved</option>

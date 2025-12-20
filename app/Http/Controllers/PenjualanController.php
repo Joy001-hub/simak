@@ -35,16 +35,12 @@ class PenjualanController extends Controller
             $sale->status = Sale::STATUS_CANCELED_HAPUS;
             $sale->save();
             $sale->lot?->update(['status' => 'available']);
-            // Increment dashboard updates counter
-            session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         } elseif ($type === 'refund') {
             $amount = (int) str_replace('.', '', $request->input('refund_amount', 0));
             $sale->status = Sale::STATUS_CANCELED_REFUND;
             $sale->refund_amount = $amount;
             $sale->save();
             $sale->lot?->update(['status' => 'available']);
-            // Increment dashboard updates counter
-            session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         } elseif ($type === 'oper_kredit') {
             $newBuyerId = $request->input('new_buyer_id');
             $newMarketerId = $request->input('new_marketer_id');
@@ -55,8 +51,6 @@ class PenjualanController extends Controller
                 $sale->marketer_id = $newMarketerId;
             }
             $sale->save();
-            // Increment dashboard updates counter
-            session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
             return redirect()->route('penjualan.show', $sale)->with('success', "Oper kredit berhasil! Pembeli diubah dari {$oldBuyerName} ke pembeli baru.");
         }
         return back()->with('success', 'Penjualan berhasil dibatalkan');
@@ -345,16 +339,11 @@ class PenjualanController extends Controller
             $sale->lot->update(['status' => 'sold']);
         }
 
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
-
         return redirect()->route('penjualan.index')->with('success', 'Penjualan ditambahkan');
     }
     public function destroy(Sale $penjualan)
     {
         $penjualan->delete();
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         return redirect()->route('penjualan.index')->with('success', 'Penjualan dihapus');
     }
     public function edit(Sale $penjualan)
@@ -464,9 +453,6 @@ class PenjualanController extends Controller
         $this->syncDownPaymentHistory($penjualan);
         $this->rebuildSchedule($penjualan);
 
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
-
         return redirect()->route('penjualan.index')->with('success', 'Penjualan diperbarui');
     }
     private function formatDocumentNumber(string $format, Sale $sale, Carbon $date): string
@@ -529,7 +515,6 @@ class PenjualanController extends Controller
         $sale->save();
     }
 }
-
 
 
 

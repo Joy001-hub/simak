@@ -26,8 +26,6 @@ class ProjectController extends Controller
     public function store(ProjectRequest $request)
     {
         Project::create($request->validated());
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         return redirect()->route('projects.index')->with('success', 'Project ditambahkan');
     }
 
@@ -39,16 +37,12 @@ class ProjectController extends Controller
     public function update(ProjectRequest $request, Project $project)
     {
         $project->update($request->validated());
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         return redirect()->route('projects.index')->with('success', 'Project diperbarui');
     }
 
     public function destroy(Project $project)
     {
         $project->delete();
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         return redirect()->route('projects.index')->with('success', 'Project dihapus');
     }
 }

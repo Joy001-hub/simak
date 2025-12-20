@@ -26,6 +26,13 @@ class PaymentController extends Controller
         ]);
 
         $sale = Sale::findOrFail($data['sale_id']);
+        if ($sale->status === 'paid_off' || (int) ($sale->outstanding_amount ?? 0) <= 0) {
+            $message = 'Transaksi sudah lunas. Pembayaran fleksibel tidak diperlukan.';
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message], 422);
+            }
+            return back()->withErrors(['msg' => $message]);
+        }
         $paymentDate = $data['date'];
         $remainingAmount = (int) $data['amount'];
         $allocatedTotal = 0;
@@ -98,9 +105,6 @@ class PaymentController extends Controller
             $message .= ' Kelebihan Rp ' . number_format($overpayAmount, 0, ',', '.') . ' dicatat.';
         }
 
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
-
         return redirect()
             ->route('penjualan.show', $sale)
             ->with('success', $message);
@@ -117,9 +121,6 @@ class PaymentController extends Controller
 
         $sale = $payment->sale;
         $this->recalculateSale($sale);
-
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
 
         return redirect()
             ->route('penjualan.show', $sale)

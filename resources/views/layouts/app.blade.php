@@ -67,27 +67,6 @@
                             d="M4 11.5 12 4l8 7.5V20a1 1 0 0 1-1 1h-4.5a.5.5 0 0 1-.5-.5v-4a1 1 0 0 0-1-1h-3a1 1 0 0 0-1 1v4a.5.5 0 0 1-.5.5H5a1 1 0 0 1-1-1v-8.5Z" />
                     </svg>
                     <span class="label">Dashboard</span>
-                    @php $dashboardUpdates = session('dashboard_updates', 0); @endphp
-                    @if($dashboardUpdates > 0)
-                        <span style="
-                                                position: absolute;
-                                                right: 12px;
-                                                top: 50%;
-                                                transform: translateY(-50%);
-                                                background: #ef4444;
-                                                color: white;
-                                                font-size: 11px;
-                                                font-weight: 700;
-                                                min-width: 20px;
-                                                height: 20px;
-                                                border-radius: 10px;
-                                                display: inline-flex;
-                                                align-items: center;
-                                                justify-content: center;
-                                                padding: 0 6px;
-                                                box-shadow: 0 2px 4px rgba(239,68,68,0.4);
-                                            ">{{ $dashboardUpdates > 99 ? '99+' : $dashboardUpdates }}</span>
-                    @endif
                 </a>
                 <a class="nav-item {{ request()->routeIs('penjualan.*') ? 'active' : '' }}"
                     href="{{ route('penjualan.index') }}">
@@ -219,7 +198,7 @@
                                 <line x1="12" y1="8" x2="12" y2="12" />
                                 <line x1="12" y1="16" x2="12.01" y2="16" />
                             </svg>
-                            <span style="font-weight: 600; font-size: 14px;">Terdapat kesalahan pada input</span>
+                            <span style="font-weight: 600; font-size: 14px;">Kesalahan pada input</span>
                             <button onclick="document.getElementById('errorToast').style.display='none'" style="
                                                         margin-left: auto;
                                                         background: rgba(255,255,255,0.2);
@@ -811,6 +790,168 @@
                 container.scrollLeft += delta;
                 e.preventDefault();
             }, { passive: false });
+        })();
+    </script>
+
+    <script>
+        (function () {
+            const STYLE_ID = 'validationPopupStyle';
+            const POPUP_ID = 'validationPopup';
+            const MESSAGE_REQUIRED = 'please fill in this field';
+            let popupEl = null;
+            let currentTarget = null;
+
+            const ensurePopup = () => {
+                if (!document.getElementById(STYLE_ID)) {
+                    const style = document.createElement('style');
+                    style.id = STYLE_ID;
+                    style.textContent = `
+                        .validation-popup {
+                            position: fixed;
+                            z-index: 10050;
+                            background: #111827;
+                            color: #fff;
+                            font-size: 12px;
+                            line-height: 1.3;
+                            padding: 8px 10px;
+                            border-radius: 8px;
+                            box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+                            max-width: 260px;
+                            display: none;
+                        }
+                        .validation-popup-arrow {
+                            position: absolute;
+                            width: 0;
+                            height: 0;
+                            border-left: 6px solid transparent;
+                            border-right: 6px solid transparent;
+                        }
+                        .validation-popup-arrow.is-above {
+                            bottom: -6px;
+                            border-top: 6px solid #111827;
+                        }
+                        .validation-popup-arrow.is-below {
+                            top: -6px;
+                            border-bottom: 6px solid #111827;
+                        }
+                        .validation-error {
+                            outline: 2px solid #ef4444;
+                            outline-offset: 2px;
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+                if (!popupEl) {
+                    popupEl = document.createElement('div');
+                    popupEl.id = POPUP_ID;
+                    popupEl.className = 'validation-popup';
+                    popupEl.setAttribute('role', 'alert');
+                    popupEl.innerHTML = `
+                        <div class="validation-popup-text"></div>
+                        <div class="validation-popup-arrow is-above"></div>
+                    `;
+                    document.body.appendChild(popupEl);
+                }
+            };
+
+            const clearHighlight = () => {
+                if (currentTarget) {
+                    currentTarget.classList.remove('validation-error');
+                    currentTarget = null;
+                }
+            };
+
+            const hidePopup = () => {
+                if (popupEl) {
+                    popupEl.style.display = 'none';
+                }
+                clearHighlight();
+            };
+
+            const showPopup = (target, message) => {
+                if (!target || !(target instanceof Element)) return;
+                ensurePopup();
+                clearHighlight();
+                currentTarget = target;
+                currentTarget.classList.add('validation-error');
+
+                try {
+                    currentTarget.scrollIntoView({ block: 'center' });
+                } catch (err) {
+                    // Ignore scroll errors.
+                }
+                try {
+                    currentTarget.focus({ preventScroll: true });
+                } catch (err) {
+                    currentTarget.focus();
+                }
+
+                const textEl = popupEl.querySelector('.validation-popup-text');
+                if (textEl) textEl.textContent = message;
+                popupEl.style.display = 'block';
+                popupEl.style.left = '0px';
+                popupEl.style.top = '0px';
+                popupEl.style.visibility = 'hidden';
+
+                const rect = target.getBoundingClientRect();
+                const popupRect = popupEl.getBoundingClientRect();
+                const margin = 10;
+                const canPlaceAbove = rect.top > popupRect.height + margin;
+                const placeAbove = canPlaceAbove;
+                const top = placeAbove
+                    ? rect.top - popupRect.height - margin
+                    : rect.bottom + margin;
+                let left = rect.left + (rect.width / 2) - (popupRect.width / 2);
+                left = Math.max(margin, Math.min(left, window.innerWidth - popupRect.width - margin));
+
+                const arrow = popupEl.querySelector('.validation-popup-arrow');
+                if (arrow) {
+                    arrow.classList.toggle('is-above', placeAbove);
+                    arrow.classList.toggle('is-below', !placeAbove);
+                    const arrowLeft = Math.min(
+                        popupRect.width - 14,
+                        Math.max(14, (rect.left + rect.width / 2) - left)
+                    );
+                    arrow.style.left = `${arrowLeft}px`;
+                }
+
+                popupEl.style.left = `${left}px`;
+                popupEl.style.top = `${Math.max(margin, top)}px`;
+                popupEl.style.visibility = 'visible';
+            };
+
+            const getInvalidField = (form) => {
+                if (!form || !(form instanceof HTMLFormElement)) return null;
+                return form.querySelector(':invalid');
+            };
+
+            document.addEventListener('submit', (e) => {
+                const form = e.target;
+                if (!(form instanceof HTMLFormElement)) return;
+                if (form.noValidate) return;
+
+                const invalid = getInvalidField(form);
+                if (!invalid) return;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                const isMissing = invalid.validity?.valueMissing;
+                const message = isMissing
+                    ? MESSAGE_REQUIRED
+                    : (invalid.validationMessage || 'invalid input');
+                showPopup(invalid, message);
+            }, true);
+
+            document.addEventListener('input', hidePopup, true);
+            document.addEventListener('change', hidePopup, true);
+            document.addEventListener('focusin', (e) => {
+                if (currentTarget && e.target !== currentTarget) {
+                    hidePopup();
+                }
+            }, true);
+            window.addEventListener('scroll', hidePopup, true);
+            window.addEventListener('resize', hidePopup);
         })();
     </script>
 

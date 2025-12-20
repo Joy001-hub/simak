@@ -22,8 +22,6 @@ class BuyerController extends Controller
     public function store(BuyerRequest $request)
     {
         $buyer = Buyer::create($request->validated());
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
 
         if ($request->has('from_sale')) {
             return redirect()->route('penjualan.create', [
@@ -37,8 +35,6 @@ class BuyerController extends Controller
     public function destroy(Buyer $buyer)
     {
         $buyer->delete();
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         return redirect()->route('buyers.index')->with('success', 'Buyer dihapus');
     }
 
@@ -50,8 +46,6 @@ class BuyerController extends Controller
     public function update(BuyerRequest $request, Buyer $buyer)
     {
         $buyer->update($request->validated());
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         return redirect()->route('buyers.index')->with('success', 'Buyer diperbarui');
     }
 }

@@ -32,7 +32,7 @@
         {{-- Single Mode Input --}}
         <div id="singleModeFields" class="field">
             <label class="hint">Blok/Number <span style="color:red">*</span></label>
-            <input class="input" type="text" name="block_number" id="singleBlockNumber" placeholder="Contoh: A 10">
+            <input class="input" type="text" name="block_number" id="singleBlockNumber" placeholder="Contoh: A 10" required>
         </div>
 
         {{-- Bulk Mode Inputs --}}
@@ -77,7 +77,7 @@
 
         <div class="field">
             <label class="hint">Status</label>
-            <select class="input" name="status">
+            <select class="input" name="status" required>
                 <option value="available">Available</option>
                 <option value="sold">Sold</option>
                 <option value="reserved">Reserved</option>

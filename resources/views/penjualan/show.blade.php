@@ -148,24 +148,37 @@
 
                 <div style="margin-top:12px; border-top:1px solid #e5e7eb; padding-top:12px;">
                     <h4 class="panel-title" style="padding:0 0 8px 0;">Pembayaran Fleksibel</h4>
+                    @php
+                        $isPaidOff = $sale->status === 'paid_off' || ((int) ($sale->outstanding_amount ?? 0) <= 0);
+                    @endphp
+                    @if($isPaidOff)
+                        <div class="hint" style="margin-bottom:8px; color:#64748B;">
+                            Transaksi sudah lunas. Pembayaran fleksibel dinonaktifkan.
+                        </div>
+                    @endif
                     <form action="{{ route('payments.store') }}" method="POST" style="display:flex; flex-direction:column; gap:8px;">
                         @csrf
                         <input type="hidden" name="sale_id" value="{{ $sale->id }}">
                         <div class="grid-2" style="column-gap:12px;">
                             <div class="field">
                                 <label class="hint">Nominal (Rp)</label>
-                                <input class="input" type="number" name="amount" min="1" placeholder="Masukkan nominal">
+                                <input class="input" type="number" name="amount" min="1" placeholder="Masukkan nominal" required
+                                    @if($isPaidOff) disabled @endif>
                             </div>
                             <div class="field">
                                 <label class="hint">Tanggal</label>
-                                <input class="input" type="date" name="date" value="{{ now()->format('Y-m-d') }}">
+                                <input class="input" type="date" name="date" value="{{ now()->format('Y-m-d') }}" required
+                                    @if($isPaidOff) disabled @endif>
                             </div>
                         </div>
                         <div class="field">
                             <label class="hint">Catatan</label>
-                            <input class="input" type="text" name="note" placeholder="Pembayaran Fleksibel">
+                            <input class="input" type="text" name="note" placeholder="Pembayaran Fleksibel"
+                                @if($isPaidOff) disabled @endif>
                         </div>
-                        <button type="submit" class="btn primary" style="align-self:flex-end;">Simpan Pembayaran</button>
+                        <button type="submit" class="btn primary" style="align-self:flex-end;" @if($isPaidOff) disabled @endif>
+                            Simpan Pembayaran
+                        </button>
                     </form>
                 </div>
             </div>
@@ -189,7 +202,14 @@
                             </tr>
                         </thead>
                         <tbody id="paymentHistoryBody">
-                            @forelse ($sale->payments()->where('status', 'paid')->orderBy('paid_at')->get() as $pay)
+                            @forelse ($sale->payments()
+                                ->where('status', 'paid')
+                                ->where(function ($q) {
+                                    $q->whereNull('note')
+                                      ->orWhere('note', 'not like', 'Angsuran%');
+                                })
+                                ->orderBy('paid_at')
+                                ->get() as $pay)
                                 <tr data-date="{{ optional($pay->paid_at)->format('Y-m-d') ?? optional($pay->due_date)->format('Y-m-d') }}" data-note="{{ strtolower($pay->note ?? 'pembayaran') }}" data-amount="{{ $pay->amount }}">
                                     <td>{{ optional($pay->paid_at)->format('d M Y') ?? optional($pay->due_date)->format('d M Y') }}</td>
                                     <td>{{ $pay->note ?? 'Pembayaran' }}</td>
@@ -274,6 +294,7 @@
         const refundInput = document.getElementById('refundInput');
         const operKreditInput = document.getElementById('operKreditInput');
         const newBuyerSelect = document.getElementById('newBuyerSelect');
+        const refundAmountInput = document.querySelector('input[name="refund_amount"]');
         const typeRadios = document.getElementsByName('type');
 
         if(cancelBtn) {
@@ -290,10 +311,12 @@
                     refundInput.classList.add('hidden');
                     operKreditInput.classList.add('hidden');
                     newBuyerSelect.removeAttribute('required');
+                    refundAmountInput?.removeAttribute('required');
                     
                     // Show relevant field based on selection
                     if(e.target.value === 'refund') {
                         refundInput.classList.remove('hidden');
+                        refundAmountInput?.setAttribute('required', 'required');
                     } else if(e.target.value === 'oper_kredit') {
                         operKreditInput.classList.remove('hidden');
                         newBuyerSelect.setAttribute('required', 'required');

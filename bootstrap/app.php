@@ -4,6 +4,10 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Throwable;
 
 require_once __DIR__ . '/mbstring_polyfill.php';
 
@@ -56,5 +60,37 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (Throwable $e, Request $request) {
+            if ($e instanceof ValidationException) {
+                return null;
+            }
+
+            if ($e instanceof HttpExceptionInterface && $e->getStatusCode() < 500) {
+                return null;
+            }
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Kesalahan pada input'], 422);
+            }
+
+            $message = 'Kesalahan pada input';
+            $isGet = $request->isMethod('get') || $request->isMethod('head');
+
+            if (! $isGet) {
+                return redirect()
+                    ->back()
+                    ->withErrors(['msg' => $message])
+                    ->withInput();
+            }
+
+            $previous = $request->headers->get('referer');
+            $current = $request->fullUrl();
+            if ($previous && $previous !== $current) {
+                return redirect()
+                    ->to($previous)
+                    ->withErrors(['msg' => $message]);
+            }
+
+            return response()->view('errors.safe', ['message' => $message], 200);
+        });
     })->create();

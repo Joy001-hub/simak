@@ -21,16 +21,12 @@ class MarketingController extends Controller
     public function store(MarketerRequest $request)
     {
         Marketer::create($request->validated());
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         return redirect()->route('marketing.index')->with('success', 'Salesman ditambahkan');
     }
 
     public function destroy(Marketer $marketing)
     {
         $marketing->delete();
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         return redirect()->route('marketing.index')->with('success', 'Salesman dihapus');
     }
 
@@ -42,8 +38,6 @@ class MarketingController extends Controller
     public function update(MarketerRequest $request, Marketer $marketing)
     {
         $marketing->update($request->validated());
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         return redirect()->route('marketing.index')->with('success', 'Salesman diperbarui');
     }
 }

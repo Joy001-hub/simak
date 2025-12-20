@@ -55,9 +55,6 @@ class LotController extends Controller
                 }
             }
 
-            // Increment dashboard updates counter by number of created lots
-            session(['dashboard_updates' => session('dashboard_updates', 0) + $created]);
-
             $msg = "{$created} kavling berhasil ditambahkan.";
             if ($skipped > 0) {
                 $msg .= " {$skipped} kavling dilewatkan karena duplikat.";
@@ -68,15 +65,12 @@ class LotController extends Controller
 
         // Single Mode
         Lot::create($request->validated());
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         return redirect()->route('kavling.index')->with('success', 'Kavling ditambahkan');
     }
 
     public function destroy(Lot $kavling, Request $request)
     {
         $kavling->delete();
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         if ($request->expectsJson()) {
             return response()->json(['message' => 'Kavling dihapus']);
         }
@@ -92,8 +86,6 @@ class LotController extends Controller
     public function update(LotRequest $request, Lot $kavling)
     {
         $kavling->update($request->validated());
-        // Increment dashboard updates counter
-        session(['dashboard_updates' => session('dashboard_updates', 0) + 1]);
         return redirect()->route('kavling.index')->with('success', 'Kavling diperbarui');
     }
 

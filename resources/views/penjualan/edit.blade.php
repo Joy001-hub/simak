@@ -51,7 +51,7 @@
             </div>
             <div class="field">
                 <label class="hint">Metode Pembayaran</label>
-                <select name="payment_method" class="input" id="paymentMethod">
+                <select name="payment_method" class="input" id="paymentMethod" required>
                     <option value="cash" @if($sale->payment_method == 'cash') selected @endif>Cash Keras</option>
                     <option value="installment" @if($sale->payment_method == 'installment') selected @endif>Angsuran In-house
                     </option>
@@ -61,7 +61,7 @@
             <div class="field">
                 <label class="hint">Tgl Booking</label>
                 <input class="input" type="date" name="booking_date"
-                    value="{{ optional($sale->booking_date)->format('Y-m-d') }}">
+                    value="{{ optional($sale->booking_date)->format('Y-m-d') }}" required>
             </div>
         </div>
 
@@ -69,7 +69,7 @@
         <div class="grid-2" style="column-gap:18px;">
             <div class="field">
                 <label class="hint">Harga Dasar (Rp)</label>
-                <input class="input" type="number" name="base_price" id="basePrice" min="0"
+                <input class="input" type="number" name="base_price" id="basePrice" min="0" required
                     value="{{ old('base_price', $sale->base_price ?? $sale->price ?? '') }}"
                     placeholder="Masukkan harga dasar">
             </div>
@@ -113,13 +113,13 @@
         <div class="grid-2" style="column-gap:18px;">
             <div class="field">
                 <label class="hint">Tenor (bulan)</label>
-                <input class="input" type="number" name="tenor_months" id="tenorInput" min="0"
+                <input class="input" type="number" name="tenor_months" id="tenorInput" min="1" required
                     value="{{ old('tenor_months', $sale->tenor_months) ?: '' }}" placeholder="Misal: 12, 24, 36">
             </div>
             <div class="field">
-                <label class="hint">Tanggal Jatuh Tempo (1-31)</label>
-                <input class="input" type="number" name="due_day" id="dueDayInput" min="1" max="31"
-                    value="{{ old('due_day', $sale->due_day ?? '') }}" placeholder="1 - 31">
+                <label class="hint">Tanggal Jatuh Tempo (1-28)</label>
+                <input class="input" type="number" name="due_day" id="dueDayInput" min="1" max="28" required
+                    value="{{ old('due_day', $sale->due_day ?? '') }}" placeholder="1 - 28">
             </div>
         </div>
         <div class="grid-2" style="column-gap:18px;">
@@ -239,6 +239,8 @@
                     dpPercentInput.disabled = true;
                     dpInput.value = '';
                     dpInput.disabled = true;
+                    tenorInput.required = false;
+                    dueDayInput.required = false;
                     dpPercentEl.textContent = `${paymentLabel} - pembayaran penuh`;
                     installmentEstimate.value = `N/A (${paymentLabel})`;
                     return; // No need to calculate DP/installments
@@ -249,6 +251,8 @@
                 dueDayInput.disabled = false;
                 dpPercentInput.disabled = false;
                 dpInput.disabled = false;
+                tenorInput.required = true;
+                dueDayInput.required = true;
 
                 const dpPercentVal = Number(dpPercentInput.value || 0);
                 const dpInputVal = Number(dpInput.value || 0);

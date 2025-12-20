@@ -18,7 +18,7 @@
             <div class="grid-2" style="column-gap:18px; row-gap:12px;">
                 <div class="field">
                     <label class="hint">Nama Perusahaan</label>
-                    <input class="input sm" type="text" name="name" value="{{ old('name', $company?->name) }}">
+                    <input class="input sm" type="text" name="name" value="{{ old('name', $company?->name) }}" required>
                 </div>
                 <div class="field">
                     <label class="hint">NPWP</label>
