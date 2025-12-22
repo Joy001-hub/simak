@@ -25,8 +25,12 @@ class PaymentController extends Controller
             'note' => 'nullable|string|max:255',
         ]);
 
-        $sale = Sale::findOrFail($data['sale_id']);
-        $paymentDate = $data['date'];
+        $sale = Sale::findOrFail($data['sale_id']); 
+        $canceledStatuses = ['canceled', Sale::STATUS_CANCELED_HAPUS, Sale::STATUS_CANCELED_REFUND, Sale::STATUS_CANCELED_OPER_KREDIT]; 
+        if ($sale->status === 'paid_off' || in_array($sale->status, $canceledStatuses, true)) { 
+            return back()->with('error', 'Pembayaran tidak dapat ditambahkan karena penjualan sudah lunas/dibatalkan.'); 
+        } 
+        $paymentDate = $data['date']; 
         $remainingAmount = (int) $data['amount'];
         $allocatedTotal = 0;
         $overpayAmount = 0;
@@ -45,8 +49,10 @@ class PaymentController extends Controller
         DB::beginTransaction();
         try {
             // Lock unpaid/partial installments ordered by due_date (oldest first)
+            // Exclude Cash Keras payments - they have their own pelunasan flow
             $installments = $sale->payments()
                 ->whereIn('status', ['unpaid', 'overdue', 'partial'])
+                ->where('note', '!=', 'Pembayaran Cash Keras')
                 ->orderBy('due_date', 'asc')
                 ->lockForUpdate()
                 ->get();
@@ -127,7 +133,7 @@ class PaymentController extends Controller
     private function recalculateSale(Sale $sale): void
     {
         $outstandingFromSchedule = $sale->payments()
-            ->whereIn('status', ['unpaid', 'overdue', 'partial'])
+            ->whereIn('status', ['unpaid', 'overdue', 'partial', 'kpr_bank'])
             ->sum('amount');
 
         $paidSum = $sale->payments()
@@ -144,6 +150,12 @@ class PaymentController extends Controller
             // If outstandingFromSchedule (unpaid DP) is 0, then Paid Amount = Price.
             $sale->outstanding_amount = $outstandingFromSchedule;
             $sale->paid_amount = max(0, $sale->price - $outstandingFromSchedule);
+        } elseif ($sale->payment_method === 'cash') {
+            // For Cash Keras, we ignore the "bill" (unpaid record) and just sum what has been paid
+            $totalPaid = $paidSum;
+            // Note: $paidSum is already calculated at the top
+            $sale->paid_amount = min($sale->price, $totalPaid);
+            $sale->outstanding_amount = max(0, $sale->price - $sale->paid_amount);
         } elseif ($outstandingFromSchedule > 0) {
             $sale->outstanding_amount = $outstandingFromSchedule;
             $sale->paid_amount = max(0, $sale->price - $outstandingFromSchedule);

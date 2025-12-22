@@ -248,6 +248,30 @@ class PenjualanController extends Controller
         $dpRemaining = max(0, $dpAmount - $dpPaid);
         $dpStatus = $dpAmount > 0 ? ($dpRemaining > 0 ? 'unpaid' : 'paid') : null;
 
+        // Calculate Cash Keras payment status with flexible payments support
+        // Refresh to ensure we have latest payment data
+        $sale->load('payments');
+
+        $cashPayment = $sale->payments->where('note', 'Pembayaran Cash Keras')->first();
+        $cashAmount = $cashPayment ? (int) $cashPayment->amount : 0;
+        $cashStatus = $cashPayment ? $cashPayment->status : null;
+        $cashPaymentId = $cashPayment ? $cashPayment->id : null;
+
+        // Calculate flexible payments already made (for cash keras) 
+        // Exclude: Booking Fee/DP (handled separately) + cash bill/final payoff entries 
+        $flexiblePaid = $sale->payments
+            ->where('status', 'paid')
+            ->whereNotIn('note', ['Pembayaran Cash Keras', 'Pelunasan Cash Keras', 'Booking Fee', 'Down Payment'])
+            ->sum('amount');
+        $cashRemaining = max(0, $cashAmount - $flexiblePaid);
+
+        // Calculate Booking Fee status
+        $bfPayment = $sale->payments->where('note', 'Booking Fee')->first();
+        $bfAmount = $bfPayment ? (int) $bfPayment->amount : 0;
+        $bfPaid = $bfPayment && $bfPayment->status === 'paid' ? $bfAmount : 0;
+        $bfRemaining = max(0, $bfAmount - $bfPaid);
+        $bfStatus = $bfAmount > 0 ? ($bfRemaining > 0 ? 'unpaid' : 'paid') : null;
+
         $penjualan = [
             'id' => $sale->id,
             'invoice' => $invoiceNumber,
@@ -264,9 +288,20 @@ class PenjualanController extends Controller
             'tgl_jatuh_tempo' => $sale->due_day,
             'dp_amount' => $dpAmount,
             'dp_paid' => $dpPaid,
-            'dp_remaining' => $dpRemaining,
+            'dp_remaining' => $dpRemaining + ($bfStatus === 'unpaid' ? $bfRemaining : 0),
             'dp_status' => $dpStatus,
             'dp_payment_id' => $dpPayment?->id,
+            'bf_amount' => $bfAmount,
+            'bf_paid' => $bfPaid,
+            'bf_remaining' => $bfRemaining,
+            'bf_status' => $bfStatus,
+            'bf_payment_id' => $bfPayment ? $bfPayment->id : null,
+            // Cash Keras data
+            'cash_amount' => $cashAmount,
+            'cash_status' => $cashStatus,
+            'cash_payment_id' => $cashPaymentId,
+            'cash_remaining' => $cashRemaining + ($bfStatus === 'unpaid' ? $bfRemaining : 0),
+            'cash_flexible_paid' => $flexiblePaid,
             'company' => ['nama' => $companyProfile->name ?? 'Nama Perusahaan', 'alamat' => $companyProfile->address ?? 'Alamat Belum Diatur', 'telepon' => $companyProfile->phone ?? '-', 'email' => $companyProfile->email ?? '-', 'logo_url' => $companyProfile->logo_path ? asset('storage/' . $companyProfile->logo_path) : null,],
             'schedule' => $sale->payments->map(function ($p) {
                 return ['no' => $p->id, 'jatuh_tempo' => optional($p->due_date)?->format('d M Y'), 'jumlah' => $p->amount, 'status' => $p->status,];
@@ -292,34 +327,45 @@ class PenjualanController extends Controller
     {
         $data = $request->validated();
         $base = (int) ($data['base_price'] ?? 0);
-        $priceInput = (int) ($data['price'] ?? 0);
         $discount = (int) ($data['discount'] ?? 0);
         $ppjb = (int) ($data['extra_ppjb'] ?? 0);
         $shm = (int) ($data['extra_shm'] ?? 0);
         $other = (int) ($data['extra_other'] ?? 0);
-        $netPrice = max(0, ($priceInput ?: $base) - $discount + $ppjb + $shm + $other);
+        $bookingFee = (int) ($data['booking_fee'] ?? 0);
+        $includeBookingFee = $request->has('booking_fee_included') && $request->input('booking_fee_included');
 
-        // Set common data
-        $data['price'] = $netPrice;
+        // Harga Netto = Harga Dasar - Diskon
+        // Grand Total = Harga Netto + Biaya Tambahan (PPJB, SHM, Lain) + Booking Fee (selalu)
+        // Jika dicentang: Booking Fee masuk ke harga jual (dihitung sebagai penerimaan)
+        $netPrice = max(0, $base - $discount);
+        $grandTotal = $netPrice + $ppjb + $shm + $other + ($includeBookingFee ? 0 : $bookingFee);
 
-        // Handle Cash Keras - full payment, no DP, no tenor, no outstanding
+        // Price for revenue: add booking fee only if NOT checked (not already included in base price)
+        $salePrice = $netPrice + $ppjb + $shm + $other + ($includeBookingFee ? 0 : $bookingFee);
+
+        // Set common data - use salePrice (may or may not include booking fee based on checkbox)
+        $data['price'] = $salePrice;
+
+        // Handle Cash Keras - create unpaid payment record, NOT auto paid_off
         if ($data['payment_method'] === 'cash') {
             $data['down_payment'] = 0;
             $data['tenor_months'] = 0;
             $data['due_day'] = null;
-            $data['paid_amount'] = $netPrice;
-            $data['outstanding_amount'] = 0;
-            $data['status'] = 'paid_off';
+            $data['paid_amount'] = 0;
+            $data['outstanding_amount'] = $grandTotal;
+            $data['status'] = 'active';
 
             $sale = Sale::create($data);
 
-            // Create single payment record
+            $this->syncBookingFeePayment($sale, $bookingFee);
+
+            // Create payment record with unpaid status - user must manually pay
             $sale->payments()->create([
                 'due_date' => $sale->booking_date ?? now(),
-                'amount' => $netPrice,
-                'status' => 'paid',
-                'note' => "Pembayaran Penuh (Cash Keras)",
-                'paid_at' => $sale->booking_date ?? now(),
+                'amount' => max(0, $grandTotal - $bookingFee),
+                'status' => 'unpaid',
+                'note' => "Pembayaran Cash Keras",
+                'paid_at' => null,
             ]);
 
             // Update lot status to 'sold'
@@ -330,49 +376,34 @@ class PenjualanController extends Controller
             return redirect()->route('penjualan.index')->with('success', 'Penjualan ditambahkan');
         }
 
-        // Handle KPR Bank - full payment to developer, but allow optional DP (belum lunas)
+        // Handle KPR Bank - full payment to developer via Bank, but generate schedule for reference
         if ($data['payment_method'] === 'kpr') {
             $dpPercent = (float) ($data['dp_percent'] ?? 0);
             $dpInput = (int) ($data['down_payment'] ?? 0);
-            $dp = $dpInput > 0 ? $dpInput : (int) round($netPrice * ($dpPercent / 100));
+            $dp = $dpInput > 0 ? $dpInput : (int) round($grandTotal * ($dpPercent / 100));
 
             $data['down_payment'] = $dp;
-            $data['tenor_months'] = 0;
-            $data['due_day'] = null;
+            // Capture KPR tenor for schedule reference
+            $data['tenor_months'] = (int) ($data['tenor_months'] ?? 0);
+            $data['due_day'] = max(1, min(28, (int) ($data['due_day'] ?? 1)));
 
-            // If no DP, treat as full payment
-            if ($dp <= 0) {
-                $data['paid_amount'] = $netPrice;
-                $data['outstanding_amount'] = 0;
-                $data['status'] = 'paid_off';
+            // Initial state: Paid 0, Outstanding = Price (until sync fixes it)
+            // Note: Developer receivables are technically only DP + Disbursement.
+            // But before verify, we can just set it to defaults and let sync handle it.
+            $data['paid_amount'] = 0;
+            $data['outstanding_amount'] = $grandTotal;
+            $data['status'] = 'active';
 
-                $sale = Sale::create($data);
+            $sale = Sale::create($data);
 
-                // Create single payment record
-                $sale->payments()->create([
-                    'due_date' => $sale->booking_date ?? now(),
-                    'amount' => $netPrice,
-                    'status' => 'paid',
-                    'note' => "Pembayaran Penuh (KPR Bank)",
-                    'paid_at' => $sale->booking_date ?? now(),
-                ]);
-            } else {
-                // DP exists - create unpaid DP record
-                $data['paid_amount'] = max(0, $netPrice - $dp); // Bank portion assumed paid
-                $data['outstanding_amount'] = $dp; // Hanya DP yang jadi piutang
-                $data['status'] = 'active';
+            $this->syncBookingFeePayment($sale, $bookingFee);
 
-                $sale = Sale::create($data);
-
-                // Create DP payment with unpaid status
-                $sale->payments()->create([
-                    'due_date' => $sale->booking_date ?? now(),
-                    'amount' => $dp,
-                    'status' => 'unpaid',
-                    'note' => 'Down Payment',
-                    'paid_at' => null,
-                ]);
+            // Build schedule if tenor > 0
+            if ($data['tenor_months'] > 0) {
+                $this->rebuildSchedule($sale);
             }
+
+            $this->syncDownPaymentHistory($sale);
 
             // Update lot status to 'sold'
             if ($sale->lot) {
@@ -387,23 +418,25 @@ class PenjualanController extends Controller
         $dueDay = max(1, min(28, (int) ($data['due_day'] ?? 1)));
         $dpPercent = (float) ($data['dp_percent'] ?? 0);
         $dpInput = (int) ($data['down_payment'] ?? 0);
-        $dp = $dpInput > 0 ? $dpInput : (int) round($netPrice * ($dpPercent / 100));
+        $dp = $dpInput > 0 ? $dpInput : (int) round($grandTotal * ($dpPercent / 100));
 
         // Handle DP 100% or DP >= price - treat as full payment
-        if ($dp >= $netPrice || $dpPercent >= 100) {
-            $data['down_payment'] = $netPrice;
+        if ($dp >= $grandTotal || $dpPercent >= 100) {
+            $data['down_payment'] = $grandTotal;
             $data['tenor_months'] = 0;
             $data['due_day'] = null;
-            $data['paid_amount'] = $netPrice;
+            $data['paid_amount'] = $grandTotal;
             $data['outstanding_amount'] = 0;
             $data['status'] = 'paid_off';
 
             $sale = Sale::create($data);
 
+            $this->syncBookingFeePayment($sale, $bookingFee);
+
             // Create single DP payment record
             $sale->payments()->create([
                 'due_date' => $sale->booking_date ?? now(),
-                'amount' => $netPrice,
+                'amount' => max(0, $grandTotal - $bookingFee),
                 'status' => 'paid',
                 'note' => 'Down Payment (100%)',
                 'paid_at' => $sale->booking_date ?? now(),
@@ -423,10 +456,11 @@ class PenjualanController extends Controller
         // Initial state: Paid 0, Outstanding Full Price (DP + Installments)
         // syncDownPaymentHistory will adjust if DP is actually paid later (but usually starts unpaid)
         $data['paid_amount'] = 0;
-        $data['outstanding_amount'] = $netPrice;
+        $data['outstanding_amount'] = $grandTotal;
         $data['status'] = 'active';
 
         $sale = Sale::create($data);
+        $this->syncBookingFeePayment($sale, $bookingFee);
         $this->rebuildSchedule($sale);      // Build Installments first
         $this->syncDownPaymentHistory($sale); // Then Calculate Totals
 
@@ -459,34 +493,46 @@ class PenjualanController extends Controller
 
         $data = $request->validated();
         $base = (int) ($data['base_price'] ?? 0);
-        $priceInput = (int) ($data['price'] ?? 0);
         $discount = (int) ($data['discount'] ?? 0);
         $ppjb = (int) ($data['extra_ppjb'] ?? 0);
         $shm = (int) ($data['extra_shm'] ?? 0);
         $other = (int) ($data['extra_other'] ?? 0);
-        $netPrice = max(0, ($priceInput ?: $base) - $discount + $ppjb + $shm + $other);
+        $bookingFee = (int) ($data['booking_fee'] ?? 0);
+        $includeBookingFee = $request->has('booking_fee_included') && $request->input('booking_fee_included');
 
-        // Set common data
-        $data['price'] = $netPrice;
+        // Harga Netto = Harga Dasar - Diskon
+        // Grand Total = Harga Netto + Biaya Tambahan (PPJB, SHM, Lain) + Booking Fee (selalu)
+        // Jika dicentang: Booking Fee masuk ke harga jual (dihitung sebagai penerimaan)
+        $netPrice = max(0, $base - $discount);
+        $grandTotal = $netPrice + $ppjb + $shm + $other + ($includeBookingFee ? 0 : $bookingFee);
+
+        // Price for revenue: add booking fee only if NOT checked (not already included in base price)
+        $salePrice = $netPrice + $ppjb + $shm + $other + ($includeBookingFee ? 0 : $bookingFee);
+
+        // Set common data - use salePrice (may or may not include booking fee based on checkbox)
+        $data['price'] = $salePrice;
 
         // Handle Cash Keras - full payment
         if ($data['payment_method'] === 'cash') {
             $data['down_payment'] = 0;
             $data['tenor_months'] = 0;
             $data['due_day'] = null;
-            $data['paid_amount'] = $netPrice;
-            $data['outstanding_amount'] = 0;
-            $data['status'] = 'paid_off';
+            $data['paid_amount'] = 0;
+            $data['outstanding_amount'] = $salePrice;
+            $data['status'] = 'active';
 
             $penjualan->update($data);
 
             $penjualan->payments()->delete();
+
+            $this->syncBookingFeePayment($penjualan, $bookingFee);
+
             $penjualan->payments()->create([
                 'due_date' => $penjualan->booking_date ?? now(),
-                'amount' => $netPrice,
-                'status' => 'paid',
-                'note' => "Pembayaran Penuh (Cash Keras)",
-                'paid_at' => $penjualan->booking_date ?? now(),
+                'amount' => max(0, $salePrice - $bookingFee),
+                'status' => 'unpaid',
+                'note' => "Pembayaran Cash Keras",
+                'paid_at' => null,
             ]);
 
             return redirect()->route('penjualan.index')->with('success', 'Penjualan diperbarui');
@@ -496,7 +542,7 @@ class PenjualanController extends Controller
         if ($data['payment_method'] === 'kpr') {
             $dpPercent = (float) ($data['dp_percent'] ?? 0);
             $dpInput = (int) ($data['down_payment'] ?? 0);
-            $dp = $dpInput > 0 ? $dpInput : (int) round($netPrice * ($dpPercent / 100));
+            $dp = $dpInput > 0 ? $dpInput : (int) round($salePrice * ($dpPercent / 100));
 
             $data['down_payment'] = $dp;
             $data['tenor_months'] = 0;
@@ -504,26 +550,31 @@ class PenjualanController extends Controller
 
             if ($dp <= 0) {
                 // No DP - Full Payment
-                $data['paid_amount'] = $netPrice;
+                $data['paid_amount'] = $salePrice;
                 $data['outstanding_amount'] = 0;
                 $data['status'] = 'paid_off';
                 $penjualan->update($data);
 
                 $penjualan->payments()->delete();
+
+                $this->syncBookingFeePayment($penjualan, $bookingFee);
+
                 $penjualan->payments()->create([
                     'due_date' => $penjualan->booking_date ?? now(),
-                    'amount' => $netPrice,
+                    'amount' => max(0, $salePrice - $bookingFee),
                     'status' => 'paid',
                     'note' => "Pembayaran Penuh (KPR Bank)",
                     'paid_at' => $penjualan->booking_date ?? now(),
                 ]);
             } else {
                 // DP Exists
-                $data['paid_amount'] = max(0, $netPrice - $dp);
+                $data['paid_amount'] = max(0, $salePrice - $dp);
                 $data['outstanding_amount'] = $dp;
                 $data['status'] = 'active';
 
                 $penjualan->update($data);
+
+                $this->syncBookingFeePayment($penjualan, $bookingFee);
 
                 // Sync/Update DP Payment
                 $this->syncDownPaymentHistory($penjualan);
@@ -537,14 +588,14 @@ class PenjualanController extends Controller
         $dueDay = max(1, min(28, (int) ($data['due_day'] ?? 1)));
         $dpPercent = (float) ($data['dp_percent'] ?? 0);
         $dpInput = (int) ($data['down_payment'] ?? 0);
-        $dp = $dpInput > 0 ? $dpInput : (int) round($netPrice * ($dpPercent / 100));
+        $dp = $dpInput > 0 ? $dpInput : (int) round($salePrice * ($dpPercent / 100));
 
         // Handle DP 100% or DP >= price - treat as full payment (same as cash)
-        if ($dp >= $netPrice || $dpPercent >= 100) {
-            $data['down_payment'] = $netPrice;
+        if ($dp >= $salePrice || $dpPercent >= 100) {
+            $data['down_payment'] = $salePrice;
             $data['tenor_months'] = 0;
             $data['due_day'] = null;
-            $data['paid_amount'] = $netPrice;
+            $data['paid_amount'] = $salePrice;
             $data['outstanding_amount'] = 0;
             $data['status'] = 'paid_off';
 
@@ -552,9 +603,12 @@ class PenjualanController extends Controller
 
             // Delete all existing payments and create single DP payment
             $penjualan->payments()->delete();
+
+            $this->syncBookingFeePayment($penjualan, $bookingFee);
+
             $penjualan->payments()->create([
                 'due_date' => $penjualan->booking_date ?? now(),
-                'amount' => $netPrice,
+                'amount' => max(0, $salePrice - $bookingFee),
                 'status' => 'paid',
                 'note' => 'Down Payment (100%)',
                 'paid_at' => $penjualan->booking_date ?? now(),
@@ -568,11 +622,11 @@ class PenjualanController extends Controller
         $dpBuffer = $penjualan->payments()->where('note', 'Down Payment')->exists() ? 0 : $dp;
 
         if ($outstandingFromSchedule > 0) {
-            $paidAmount = max(0, $netPrice - $outstandingFromSchedule);
+            $paidAmount = max(0, $salePrice - $outstandingFromSchedule);
             $outstanding = $outstandingFromSchedule;
         } else {
-            $paidAmount = min($netPrice, $dpBuffer + $paidSum);
-            $outstanding = max(0, $netPrice - $paidAmount);
+            $paidAmount = min($salePrice, $dpBuffer + $paidSum);
+            $outstanding = max(0, $salePrice - $paidAmount);
         }
 
         $data['down_payment'] = $dp;
@@ -583,6 +637,7 @@ class PenjualanController extends Controller
         $data['status'] = $outstanding > 0 ? 'active' : 'paid_off';
 
         $penjualan->update($data);
+        $this->syncBookingFeePayment($penjualan, $bookingFee);
         $this->rebuildSchedule($penjualan);      // Build/Update Installments first
         $this->syncDownPaymentHistory($penjualan); // Then Recalculate Totals based on new structure
 
@@ -606,8 +661,10 @@ class PenjualanController extends Controller
                 $q->whereNull('note')->orWhere('note', 'like', 'Angsuran%');
             })->sum('amount');
 
+        $bookingFee = $sale->payments()->where('note', 'Booking Fee')->sum('amount');
+
         // The remaining principal to be split into FUTURE installments
-        $outstandingForSchedule = max(0, $price - $dp - $paidInstallments);
+        $outstandingForSchedule = max(0, $price - $dp - $paidInstallments - $bookingFee);
 
         if ($outstandingForSchedule <= 0 || ($sale->tenor_months ?? 0) <= 0) {
             $sale->payments()->where('status', 'unpaid')->where('note', 'like', 'Angsuran%')->delete();
@@ -634,18 +691,51 @@ class PenjualanController extends Controller
         }
 
         // Only delete UNPAID installments to regenerate them
-        $sale->payments()->where('status', 'unpaid')->where(function ($q) {
+        // Also delete kpr_bank status if KPR
+        $statusesToDelete = ['unpaid'];
+        if ($sale->payment_method === 'kpr') {
+            $statusesToDelete[] = 'kpr_bank';
+        }
+
+        $sale->payments()->whereIn('status', $statusesToDelete)->where(function ($q) {
             $q->where('note', 'like', 'Angsuran%')->orWhereNull('note');
         })->delete();
 
         $perTerm = intdiv($outstandingForSchedule, $remainingTenor);
         $remainder = $outstandingForSchedule - ($perTerm * $remainingTenor);
+
+        // Determine status and note prefix based on method
+        $status = $sale->payment_method === 'kpr' ? 'kpr_bank' : 'unpaid';
+        $notePrefix = $sale->payment_method === 'kpr' ? 'Angsuran Bank ke-' : 'Angsuran ke-';
+
         for ($i = 0; $i < $remainingTenor; $i++) {
             $amount = $perTerm + ($i < $remainder ? 1 : 0);
             $dueDate = $startDate->copy()->addMonths($i);
-            $sale->payments()->create(['due_date' => $dueDate, 'amount' => $amount, 'status' => 'unpaid', 'note' => 'Angsuran ke-' . ($paidCount + $i + 1),]);
+            $sale->payments()->create(['due_date' => $dueDate, 'amount' => $amount, 'status' => $status, 'note' => $notePrefix . ($paidCount + $i + 1),]);
         }
     }
+    private function syncBookingFeePayment(Sale $sale, int $amount): void
+    {
+        $payment = $sale->payments()->where('note', 'Booking Fee')->first();
+        if ($amount > 0) {
+            if (!$payment) {
+                // Create Booking Fee payment with 'unpaid' status
+                $sale->payments()->create([
+                    'due_date' => $sale->booking_date ?? now(),
+                    'amount' => $amount,
+                    'status' => 'unpaid',
+                    'note' => 'Booking Fee',
+                    'paid_at' => null,
+                ]);
+            } else {
+                // Update amount but preserve status
+                $payment->update(['amount' => $amount]);
+            }
+        } elseif ($payment) {
+            $payment->delete();
+        }
+    }
+
     private function syncDownPaymentHistory(Sale $sale): void
     {
         $dpAmount = max(0, (int) $sale->down_payment);
@@ -672,7 +762,7 @@ class PenjualanController extends Controller
         } elseif ($dpPayment) {
             $dpPayment->delete();
         }
-        $outstandingFromSchedule = $sale->payments()->whereIn('status', ['unpaid', 'partial', 'overdue'])->sum('amount');
+        $outstandingFromSchedule = $sale->payments()->whereIn('status', ['unpaid', 'partial', 'overdue', 'kpr_bank'])->sum('amount');
         $paidSum = $sale->payments()->where('status', 'paid')->sum('amount');
 
         // Strict Accounting for ALL types (Cash, KPR, In-house)
@@ -736,13 +826,65 @@ class PenjualanController extends Controller
             ]);
         }
 
+        // Delete KPR Bank installments to resolve outstanding amount (replaced by Paid disbursement)
+        $sale->payments()->where('status', 'kpr_bank')->delete();
+
         // Recalculate totals
         $this->syncDownPaymentHistory($sale);
 
         return back()->with('success', 'KPR Disetujui. Pembayaran Bank tercatat.');
     }
+
+    public function payOffCash(Sale $sale)
+    {
+        if ($sale->payment_method !== 'cash') {
+            return back()->with('error', 'Hanya untuk penjualan Cash Keras');
+        }
+
+        // Auto-settle Booking Fee if unpaid (since user is paying full amount)
+        $bfPayment = $sale->payments()->where('note', 'Booking Fee')->where('status', 'unpaid')->first();
+        if ($bfPayment) {
+            $bfPayment->update([
+                'status' => 'paid',
+                'paid_at' => now(),
+            ]);
+        }
+
+        // Find the unpaid cash payment
+        $cashPayment = $sale->payments()->where('note', 'Pembayaran Cash Keras')->where('status', 'unpaid')->first();
+
+        if (!$cashPayment) {
+            return back()->with('error', 'Tidak ada pembayaran Cash Keras yang belum lunas');
+        }
+
+        // Calculate flexible payments already made (exclude booking fee/DP and cash bill/final payoff entries) 
+        $flexiblePaid = $sale->payments()
+            ->where('status', 'paid')
+            ->whereNotIn('note', ['Pembayaran Cash Keras', 'Pelunasan Cash Keras', 'Booking Fee', 'Down Payment'])
+            ->sum('amount');
+
+        $remaining = max(0, $cashPayment->amount - $flexiblePaid);
+
+        if ($remaining > 0) {
+            // Create a new payment record for the remaining amount
+            $sale->payments()->create([
+                'due_date' => now(),
+                'amount' => $remaining,
+                'status' => 'paid',
+                'note' => 'Pelunasan Cash Keras',
+                'paid_at' => now(),
+            ]);
+        }
+
+        // Delete the original unpaid "bill" record to avoid double counting
+        // (because we now have flexible payments + pelunasan record = Total Price)
+        $cashPayment->delete();
+
+        // Recalculate totals
+        $this->syncDownPaymentHistory($sale);
+
+        return back()->with('success', 'Penjualan Cash Keras berhasil dilunasi.');
+    }
 }
-
-
 
 

@@ -89,6 +89,26 @@
                     <span class="stat-value" style="font-size:18px; color:#b4232a;">Rp {{ number_format($penjualan['sisa_piutang'], 0, ',', '.') }}</span>
                 </div>
                 
+                @if($penjualan['bf_amount'] > 0)
+                    @if($penjualan['bf_status'] === 'unpaid')
+                    <div style="margin-top:12px; padding:14px 16px; background:#fef3c7; border-radius:10px; display:flex; flex-direction:column; align-items:center; gap:10px;">
+                        <span style="color:#92400e; font-size:14px;">Booking Fee belum lunas: <strong>Rp {{ number_format($penjualan['bf_remaining'], 0, ',', '.') }}</strong></span>
+                        @if($penjualan['bf_payment_id'])
+                        <form action="{{ route('payments.update', $penjualan['bf_payment_id']) }}" method="POST" style="display:inline;">
+                            @csrf
+                            @method('PATCH')
+                            <button type="submit" class="btn" style="background:#eab308; color:#fff; padding:8px 16px; border:none; border-radius:6px; font-weight:600; cursor:pointer;">Bayar Booking Fee</button>
+                        </form>
+                        @endif
+                    </div>
+                    @else
+                    <div style="margin-top:12px; padding:14px 16px; background:#d1fae5; border-radius:10px; display:flex; flex-direction:column; align-items:center; gap:4px;">
+                        <span style="color:#166534; font-size:14px;">Booking Fee: <strong>Rp {{ number_format($penjualan['bf_amount'], 0, ',', '.') }}</strong></span>
+                        <span class="status-chip success" style="background:#22c55e; color:#fff; padding:4px 12px; border-radius:20px; font-size:12px;">Lunas</span>
+                    </div>
+                    @endif
+                @endif
+                
                 @if($penjualan['dp_amount'] > 0)
                     @if($penjualan['dp_status'] === 'unpaid')
                     <div style="margin-top:12px; padding:14px 16px; background:#fef3c7; border-radius:10px; display:flex; flex-direction:column; align-items:center; gap:10px;">
@@ -113,6 +133,27 @@
                     @else
                     <div style="margin-top:12px; padding:14px 16px; background:#d1fae5; border-radius:10px; display:flex; flex-direction:column; align-items:center; gap:4px;">
                         <span style="color:#166534; font-size:14px;">DP: <strong>Rp {{ number_format($penjualan['dp_amount'], 0, ',', '.') }}</strong></span>
+                        <span class="status-chip success" style="background:#22c55e; color:#fff; padding:4px 12px; border-radius:20px; font-size:12px;">Lunas</span>
+                    </div>
+                    @endif
+                @endif
+
+                {{-- Cash Keras Pelunasan Section --}}
+                @if($sale->payment_method === 'cash')
+                    @if($penjualan['cash_status'] === 'unpaid' && $penjualan['cash_remaining'] > 0)
+                    <div style="margin-top:12px; padding:14px 16px; background:#fef3c7; border-radius:10px; display:flex; flex-direction:column; align-items:center; gap:10px;">
+                        <span style="color:#92400e; font-size:14px;">Sisa Pembayaran Cash Keras: <strong>Rp {{ number_format($penjualan['cash_remaining'], 0, ',', '.') }}</strong></span>
+                        @if($penjualan['cash_flexible_paid'] > 0)
+                        <span style="color:#64748b; font-size:12px;">Total: Rp {{ number_format($penjualan['cash_amount'], 0, ',', '.') }} - Terbayar Fleksibel: Rp {{ number_format($penjualan['cash_flexible_paid'], 0, ',', '.') }}</span>
+                        @endif
+                        <form action="{{ route('penjualan.payOffCash', $sale) }}" method="POST" style="display:inline;">
+                            @csrf
+                            <button type="submit" class="btn" style="background:#22c55e; color:#fff; padding:8px 16px; border:none; border-radius:6px; font-weight:600; cursor:pointer;">Lunasi Penjualan (Rp {{ number_format($penjualan['cash_remaining'], 0, ',', '.') }})</button>
+                        </form>
+                    </div>
+                    @elseif($penjualan['cash_status'] === 'paid' || $sale->status === 'paid_off' || ($penjualan['cash_remaining'] <= 0 && $penjualan['cash_amount'] > 0))
+                    <div style="margin-top:12px; padding:14px 16px; background:#d1fae5; border-radius:10px; display:flex; flex-direction:column; align-items:center; gap:4px;">
+                        <span style="color:#166534; font-size:14px;">Pembayaran Cash Keras: <strong>Rp {{ number_format($penjualan['cash_amount'] > 0 ? $penjualan['cash_amount'] : $sale->price, 0, ',', '.') }}</strong></span>
                         <span class="status-chip success" style="background:#22c55e; color:#fff; padding:4px 12px; border-radius:20px; font-size:12px;">Lunas</span>
                     </div>
                     @endif
@@ -151,25 +192,31 @@
                             </tr>
                         </thead>
                         <tbody>
+                            @php $rowNum = 0; @endphp
                             @forelse ($sale->payments as $payment)
                                 @php
                                     $note = $payment->note ?? '';
-                                    $isSchedule = $note === null || str_starts_with($note, 'Angsuran') || str_starts_with($note, 'Down Payment');
+                                    $isSchedule = $note === null || str_starts_with($note, 'Angsuran') || str_starts_with($note, 'Angsuran Bank');
                                 @endphp
                                 @if (! $isSchedule)
                                     @continue
                                 @endif
+                                @php $rowNum++; @endphp
                                 <tr>
-                                    <td>{{ $loop->iteration }}</td>
+                                    <td>{{ $rowNum }}</td>
                                     <td>{{ optional($payment->due_date)->format('d M Y') }}</td>
                                     <td>Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
                                     <td>
-                                        <span class="status-chip {{ in_array($payment->status, ['paid', 'distributed']) ? 'success' : ($payment->status === 'partial' ? 'warning' : 'info') }}" style="{{ $payment->status === 'partial' ? 'background:#fef3c7; color:#92400e;' : '' }}">
-                                            {{ in_array($payment->status, ['paid', 'distributed']) ? 'Lunas' : ucfirst($payment->status) }}
-                                        </span>
+                                        @if($payment->status === 'kpr_bank')
+                                            <span class="status-chip hint" style="background:#f3f4f6; color:#6b7280;">N/A</span>
+                                        @else
+                                            <span class="status-chip {{ in_array($payment->status, ['paid', 'distributed']) ? 'success' : ($payment->status === 'partial' ? 'warning' : 'info') }}" style="{{ $payment->status === 'partial' ? 'background:#fef3c7; color:#92400e;' : '' }}">
+                                                {{ in_array($payment->status, ['paid', 'distributed']) ? 'Lunas' : ucfirst($payment->status) }}
+                                            </span>
+                                        @endif
                                     </td>
                                     <td style="text-align:right; white-space:nowrap;">
-                                        @if (!in_array($payment->status, ['paid', 'distributed']))
+                                        @if (!in_array($payment->status, ['paid', 'distributed', 'kpr_bank']))
                                             <form action="{{ route('payments.update', $payment) }}" method="POST" style="display:inline;">
                                                 @csrf
                                                 @method('PATCH')
@@ -191,39 +238,53 @@
                     </table>
                 </div>
 
-                <div style="margin-top:12px; border-top:1px solid #e5e7eb; padding-top:12px;">
-                    <h4 class="panel-title" style="padding:0 0 8px 0;">Pembayaran Fleksibel</h4>
-                    @if(isset($penjualan['dp_status']) && $penjualan['dp_status'] === 'unpaid')
-                        <div style="background:#fef2f2; border:1px solid #fecaca; padding:12px; border-radius:8px; color:#b91c1c; font-size:13px;">
-                            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; font-weight:600;">
-                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                                Akses Dibatasi
-                            </div>
-                            Pembayaran fleksibel hanya dapat dilakukan setelah Down Payment (DP) lunas. Silakan selesaikan pembayaran DP di kotak ringkasan finansial di atas.
-                        </div>
-                    @else
-                        <form action="{{ route('payments.store') }}" method="POST" style="display:flex; flex-direction:column; gap:8px;">
-                            @csrf
-                            <input type="hidden" name="sale_id" value="{{ $sale->id }}">
-                            <div class="grid-2" style="column-gap:12px;">
-                                <div class="field">
-                                    <label class="hint">Nominal (Rp)</label>
-                                    <input class="input currency-input" type="text" name="amount" min="1" placeholder="Masukkan nominal" required>
-                                </div>
-                                <div class="field">
-                                    <label class="hint">Tanggal</label>
-                                    <input class="input" type="date" name="date" value="{{ now()->format('Y-m-d') }}">
-                                </div>
-                            </div>
-                            <div class="field">
-                                <label class="hint">Catatan</label>
-                                <input class="input" type="text" name="note" placeholder="Pembayaran Fleksibel">
-                            </div>
-                            <button type="submit" class="btn primary" style="align-self:flex-end;">Simpan Pembayaran</button>
-                        </form>
-                    @endif
-                </div>
-            </div>
+                <div style="margin-top:12px; border-top:1px solid #e5e7eb; padding-top:12px;"> 
+                    <h4 class="panel-title" style="padding:0 0 8px 0;">Pembayaran Fleksibel</h4> 
+                    @php 
+                        $isKpr = $sale->payment_method === 'kpr';
+                        $isInstallment = $sale->payment_method === 'installment';
+                        
+                        // Check if mandatory early payments (BF/DP) are unpaid
+                        $bfUnpaid = ($penjualan['bf_amount'] > 0 && $penjualan['bf_status'] !== 'paid');
+                        $dpUnpaid = ($penjualan['dp_amount'] > 0 && $penjualan['dp_status'] !== 'paid');
+                        
+                        // Block installment flexible payment if early payments aren't cleared
+                        $installmentBlocked = $isInstallment && ($bfUnpaid || $dpUnpaid);
+
+                        $disableFlexiblePayment = $isKpr || $installmentBlocked || $sale->status === 'paid_off' || in_array($sale->status, ['canceled', \App\Models\Sale::STATUS_CANCELED_HAPUS, \App\Models\Sale::STATUS_CANCELED_REFUND, \App\Models\Sale::STATUS_CANCELED_OPER_KREDIT], true); 
+                    @endphp 
+                    <form action="{{ route('payments.store') }}" method="POST" style="display:flex; flex-direction:column; gap:8px;"> 
+                        @csrf 
+                        <input type="hidden" name="sale_id" value="{{ $sale->id }}"> 
+                        <div class="grid-2" style="column-gap:12px;"> 
+                            <div class="field"> 
+                                <label class="hint">Nominal (Rp)</label> 
+                                <input class="input currency-input" type="text" name="amount" min="1" placeholder="Masukkan nominal" required {{ $disableFlexiblePayment ? 'disabled' : '' }}> 
+                            </div> 
+                            <div class="field"> 
+                                <label class="hint">Tanggal</label> 
+                                <input class="input" type="date" name="date" value="{{ now()->format('Y-m-d') }}" {{ $disableFlexiblePayment ? 'disabled' : '' }}> 
+                            </div> 
+                        </div> 
+                        <div class="field"> 
+                            <label class="hint">Catatan</label> 
+                            <input class="input" type="text" name="note" placeholder="Pembayaran Fleksibel" {{ $disableFlexiblePayment ? 'disabled' : '' }}> 
+                        </div> 
+                        <button type="submit" class="btn primary" style="align-self:flex-end; {{ $disableFlexiblePayment ? 'opacity:.6; cursor:not-allowed;' : '' }}" {{ $disableFlexiblePayment ? 'disabled' : '' }}>Simpan Pembayaran</button> 
+                        @if($disableFlexiblePayment) 
+                            <span class="hint" style="color:#64748b; font-size:12px;">
+                                @if($isKpr)
+                                    Pembayaran Fleksibel tidak tersedia untuk metode pembayaran KPR Bank.
+                                @elseif($installmentBlocked)
+                                    Harap lunasi <strong>{{ $bfUnpaid ? 'Booking Fee' : '' }} {{ ($bfUnpaid && $dpUnpaid) ? 'dan' : '' }} {{ $dpUnpaid ? 'Uang Muka (DP)' : '' }}</strong> terlebih dahulu untuk melakukan pembayaran fleksibel.
+                                @else
+                                    Pembayaran Fleksibel dinonaktifkan karena status penjualan sudah lunas/dibatalkan.
+                                @endif
+                            </span> 
+                        @endif 
+                    </form> 
+                </div> 
+            </div> 
 
             <div class="card" style="gap:6px;">
                 <h3 class="panel-title" style="padding:0 0 6px 0;">Riwayat Pembayaran</h3>
@@ -418,6 +479,15 @@
                 if (val) {
                     e.target.value = new Intl.NumberFormat('id-ID').format(val);
                 }
+            });
+        });
+
+        // Strip currency formatting on form submit (for flexible payment form)
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', (e) => {
+                form.querySelectorAll('.currency-input').forEach(input => {
+                    input.value = input.value.replace(/\./g, '');
+                });
             });
         });
 

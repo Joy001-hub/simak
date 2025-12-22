@@ -8,11 +8,15 @@ class NativeAppServiceProvider implements ProvidesPhpIni
     {
         Window::open()
             ->title(config('app.name', 'Simak'))
+            ->width(1250)
+            ->height(650)
             ->maximized()
+            
             ->hideMenu()
             ->focusable()
             ->webPreferences([
                 'acceptFirstMouse' => true,
+
             ])
             ->icon(public_path('icon.png'));
     }

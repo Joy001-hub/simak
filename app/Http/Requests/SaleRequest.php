@@ -40,6 +40,8 @@ class SaleRequest extends FormRequest
             'extra_ppjb' => ['nullable', 'integer', 'min:0'],
             'extra_shm' => ['nullable', 'integer', 'min:0'],
             'extra_other' => ['nullable', 'integer', 'min:0'],
+            'booking_fee' => ['nullable', 'integer', 'min:0'],
+            'booking_fee_included' => ['nullable', 'boolean'],
             'down_payment' => ['nullable', 'integer', 'min:0'],
             'dp_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'tenor_months' => ['nullable', 'integer', 'min:0', 'max:480'],

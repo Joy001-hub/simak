@@ -76,13 +76,13 @@
             <div class="field">
                 <label class="hint">Promo/Diskon (Rp)</label>
                 <input class="input" type="number" name="discount" id="discount" min="0"
-                    value="{{ old('discount', $sale->discount ?? '') }}" placeholder="Diskon/promo (opsional)">
+                    value="{{ old('discount', $sale->discount ?? '') }}" placeholder="Diskon/promo">
             </div>
-            <div class="field">
-                <label class="hint">Harga Netto (Rp)</label>
-                <input class="input readonly" type="number" name="price" id="netPrice" min="0"
-                    value="{{ old('price', $sale->price ?? '') }}" placeholder="Otomatis dihitung" readonly>
-            </div>
+        </div>
+        <div class="field">
+            <label class="hint">Harga Netto (Rp)</label>
+            <input class="input readonly" type="number" name="price" id="netPrice" min="0"
+                value="{{ old('price', $sale->price ?? '') }}" placeholder="Otomatis dihitung" readonly>
         </div>
 
         <h3 class="panel-title">Biaya Tambahan</h3>
@@ -97,16 +97,28 @@
                 <input class="input" type="number" name="extra_shm" id="extraShm" min="0"
                     value="{{ old('extra_shm', $sale->extra_shm ?? '') }}" placeholder="Isi jika ada biaya SHM">
             </div>
+        </div>
+        <div class="grid-2" style="column-gap:18px;">
             <div class="field">
                 <label class="hint">Biaya Lain (Rp)</label>
                 <input class="input" type="number" name="extra_other" id="extraOther" min="0"
-                    value="{{ old('extra_other', $sale->extra_other ?? '') }}" placeholder="Biaya lain (opsional)">
+                    value="{{ old('extra_other', $sale->extra_other ?? '') }}" placeholder="Biaya lain">
             </div>
             <div class="field">
-                <label class="hint">Grand Total (Rp)</label>
-                <input class="input readonly" type="number" id="grandTotal" min="0"
-                    value="{{ old('price', $sale->price ?? '') }}" placeholder="Otomatis dihitung" readonly>
+                <label class="hint">Booking Fee (Rp)</label>
+                <input class="input" type="number" name="booking_fee" id="bookingFeeInput" min="0"
+                    value="{{ old('booking_fee', $sale->booking_fee ?? '') }}" placeholder="Booking Fee">
+                <label
+                    style="display:flex; align-items:center; gap:6px; margin-top:6px; font-size:12px; color:#64748B; cursor:pointer;">
+                    <input type="checkbox" name="booking_fee_included" id="bookingFeeIncluded" value="1" {{ old('booking_fee_included', $sale->booking_fee_included ?? false) ? 'checked' : '' }}>
+                    Sudah termasuk harga unit
+                </label>
             </div>
+        </div>
+        <div class="field">
+            <label class="hint">Grand Total (Rp)</label>
+            <input class="input readonly" type="number" id="grandTotal" min="0"
+                value="{{ old('price', $sale->price ?? '') }}" placeholder="Otomatis dihitung" readonly>
         </div>
 
         <h3 class="panel-title">Skema Pembayaran</h3>
@@ -126,7 +138,7 @@
             <div class="field">
                 <label class="hint">Uang Muka (%)</label>
                 <input class="input" type="number" name="dp_percent" id="dpPercentInput" min="0" max="100" step="any"
-                    value="{{ old('dp_percent') ?: '' }}" placeholder="Misal: 10, 20, dst (opsional)">
+                    value="{{ old('dp_percent') ?: '' }}" placeholder="Misal: 10, 20, dst">
             </div>
             <div class="field">
                 <label class="hint">Uang Muka (Rp)</label>
@@ -164,6 +176,8 @@
             const installmentEstimate = document.getElementById('installmentEstimate');
             const dueDayInput = document.getElementById('dueDayInput');
             const lotSelect = document.getElementById('lotSelect');
+            const bookingFeeInput = document.getElementById('bookingFeeInput');
+            const bookingFeeIncluded = document.getElementById('bookingFeeIncluded');
             window.lastDpChange = null;
 
             function formatIDR(n) {
@@ -220,10 +234,17 @@
                 const ppjb = Number(extraPpjb.value || 0);
                 const shm = Number(extraShm.value || 0);
                 const oth = Number(extraOther.value || 0);
+                const bookingFee = Number(bookingFeeInput?.value || 0);
+                const includeBookingFee = bookingFeeIncluded?.checked || false;
 
-                const net = Math.max(0, base - disc + ppjb + shm + oth);
+                // Harga Netto = Harga Dasar - Diskon
+                const net = Math.max(0, base - disc);
+                // Grand Total = Harga Netto + Biaya Tambahan (PPJB, SHM, Lain)
+                // Jika TIDAK dicentang: Booking Fee ditambahkan ke Grand Total
+                // Jika dicentang (Sudah Termasuk harga unit): Booking Fee TIDAK ditambahkan karena sudah termasuk di harga dasar
+                const total = net + ppjb + shm + oth + (includeBookingFee ? 0 : bookingFee);
                 netPrice.value = net;
-                grandTotal.value = net;
+                grandTotal.value = total;
 
                 // Handle Cash Keras - full payment, disable all installment fields
                 if (paymentMethod.value === 'cash') {
@@ -235,8 +256,8 @@
                     dpPercentInput.disabled = true;
                     dpInput.value = '';
                     dpInput.disabled = true;
-                    dpPercentEl.textContent = 'N/A (Cash Keras)';
-                    installmentEstimate.value = 'N/A (Cash Keras)';
+                    dpPercentEl.textContent = '100% (Cash Keras)';
+                    installmentEstimate.value = '100% (Cash Keras)';
                     return;
                 }
 
@@ -298,7 +319,8 @@
                 installmentEstimate.value = formatIDR(monthly);
             }
 
-            [basePrice, discount, extraPpjb, extraShm, extraOther, dpPercentInput, dpInput, tenorInput, paymentMethod].forEach(el => el?.addEventListener('input', recalc));
+            [basePrice, discount, extraPpjb, extraShm, extraOther, bookingFeeInput, dpPercentInput, dpInput, tenorInput, paymentMethod].forEach(el => el?.addEventListener('input', recalc));
+            bookingFeeIncluded?.addEventListener('change', recalc);
             dpPercentInput?.addEventListener('input', () => { window.lastDpChange = 'percent'; recalc(); });
             dpInput?.addEventListener('input', () => { window.lastDpChange = 'nominal'; recalc(); });
             [basePrice, discount, extraPpjb, extraShm, extraOther, tenorInput, paymentMethod].forEach(el => el?.addEventListener('input', () => { if (!['percent', 'nominal'].includes(window.lastDpChange)) window.lastDpChange = null; recalc(); }));

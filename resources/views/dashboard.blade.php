@@ -774,6 +774,9 @@
                             display: false
                         },
                         tooltip: {
+                            filter: function (tooltipItem) {
+                                return tooltipItem.parsed.y > 0 && tooltipItem.dataset.label !== '';
+                            },
                             callbacks: {
                                 label: ctx => `${ctx.dataset.label}: ${salesMode === 'unit' ? unitTick(ctx.parsed.y) : formatRupiahFull(ctx.parsed.y)}`
                             }

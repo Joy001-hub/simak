@@ -76,14 +76,14 @@
                 <label class="hint">Promo/Diskon (Rp)</label>
                 <input class="input currency-input" type="text" name="discount" id="discount"
                     value="{{ old('discount') ? number_format((float) str_replace('.', '', old('discount')), 0, ',', '.') : '' }}"
-                    placeholder="Diskon/promo (opsional)">
+                    placeholder="Diskon/promo">
             </div>
-            <div class="field">
-                <label class="hint">Harga Netto (Rp)</label>
-                <input class="input readonly" type="text" name="price" id="netPrice"
-                    value="{{ old('price') ? number_format((float) str_replace('.', '', old('price')), 0, ',', '.') : '' }}"
-                    placeholder="Otomatis dihitung" readonly>
-            </div>
+        </div>
+        <div class="field">
+            <label class="hint">Harga Netto (Rp)</label>
+            <input class="input readonly" type="text" name="price" id="netPrice"
+                value="{{ old('price') ? number_format((float) str_replace('.', '', old('price')), 0, ',', '.') : '' }}"
+                placeholder="Otomatis dihitung" readonly>
         </div>
 
         <h3 class="panel-title">Biaya Tambahan</h3>
@@ -100,18 +100,31 @@
                     value="{{ old('extra_shm') ? number_format((float) str_replace('.', '', old('extra_shm')), 0, ',', '.') : '' }}"
                     placeholder="Isi jika ada biaya SHM">
             </div>
+        </div>
+        <div class="grid-2" style="column-gap:18px;">
             <div class="field">
                 <label class="hint">Biaya Lain (Rp)</label>
                 <input class="input currency-input" type="text" name="extra_other" id="extraOther"
                     value="{{ old('extra_other') ? number_format((float) str_replace('.', '', old('extra_other')), 0, ',', '.') : '' }}"
-                    placeholder="Biaya lain (opsional)">
+                    placeholder="Biaya lain">
             </div>
             <div class="field">
-                <label class="hint">Grand Total (Rp)</label>
-                <input class="input readonly" type="text" id="grandTotal"
-                    value="{{ old('price') ? number_format((float) str_replace('.', '', old('price')), 0, ',', '.') : '' }}"
-                    placeholder="Otomatis dihitung" readonly>
+                <label class="hint">Booking Fee (Rp)</label>
+                <input class="input currency-input" type="text" name="booking_fee" id="bookingFeeInput"
+                    value="{{ old('booking_fee') ? number_format((float) str_replace('.', '', old('booking_fee')), 0, ',', '.') : '' }}"
+                    placeholder="Booking Fee">
+                <label
+                    style="display:flex; align-items:center; gap:6px; margin-top:6px; font-size:12px; color:#64748B; cursor:pointer;">
+                    <input type="checkbox" name="booking_fee_included" id="bookingFeeIncluded" value="1" {{ old('booking_fee_included') ? 'checked' : '' }}>
+                    Sudah Termasuk harga unit
+                </label>
             </div>
+        </div>
+        <div class="field">
+            <label class="hint">Grand Total (Rp)</label>
+            <input class="input readonly" type="text" id="grandTotal"
+                value="{{ old('price') ? number_format((float) str_replace('.', '', old('price')), 0, ',', '.') : '' }}"
+                placeholder="Otomatis dihitung" readonly>
         </div>
 
         <h3 class="panel-title">Skema Pembayaran</h3>
@@ -132,17 +145,11 @@
                 <label class="hint">Uang Muka (%)</label>
                 <div style="display:flex; align-items:center; gap:10px;">
                     <input class="input" type="number" name="dp_percent" id="dpPercentInput" min="0" max="100" step="any"
-                        value="{{ old('dp_percent') ?: '' }}" placeholder="Misal: 10, 20, dst (opsional)" style="flex:1;">
+                        value="{{ old('dp_percent') ?: '' }}" placeholder="Misal: 10, 20, dst " style="flex:1;">
                     <span style="color:#64748B; font-size:13px; white-space:nowrap;">/ <strong id="dpRupiahDisplay">Rp
                             0</strong></span>
                 </div>
                 <input type="hidden" name="down_payment" id="dpInput" value="{{ old('down_payment') ?: '' }}">
-            </div>
-            <div class="field">
-                <label class="hint">Booking Fee (Rp)</label>
-                <input class="input currency-input" type="text" name="booking_fee" id="bookingFeeInput"
-                    value="{{ old('booking_fee') ? number_format((float) str_replace('.', '', old('booking_fee')), 0, ',', '.') : '' }}"
-                    placeholder="Booking Fee (opsional)">
             </div>
         </div>
         <div class="field">
@@ -153,7 +160,7 @@
         <div class="field">
             <label class="hint">Catatan Transaksi</label>
             <textarea class="input" name="notes" rows="3"
-                placeholder="Catatan tambahan untuk transaksi ini (opsional)">{{ old('notes', '') }}</textarea>
+                placeholder="Catatan tambahan untuk transaksi ini">{{ old('notes', '') }}</textarea>
         </div>
 
         <div style="display:flex; gap:10px; justify-content:flex-end;">
@@ -181,6 +188,7 @@
             const dueDayInput = document.getElementById('dueDayInput');
             const lotSelect = document.getElementById('lotSelect');
             const bookingFeeInput = document.getElementById('bookingFeeInput');
+            const bookingFeeIncluded = document.getElementById('bookingFeeIncluded');
             window.lastDpChange = null;
 
             function formatIDR(n) {
@@ -250,10 +258,22 @@
                 const ppjb = parseIDR(extraPpjb.value);
                 const shm = parseIDR(extraShm.value);
                 const oth = parseIDR(extraOther.value);
+                const bookingFee = parseIDR(bookingFeeInput?.value || '0');
+                const includeBookingFee = bookingFeeIncluded?.checked || false;
 
-                const net = Math.max(0, base - disc + ppjb + shm + oth);
+                // Harga Netto = Harga Dasar - Diskon
+                const net = Math.max(0, base - disc);
+                // Grand Total = Harga Netto + Biaya Tambahan (PPJB, SHM, Lain)
+                // Jika TIDAK dicentang: Booking Fee ditambahkan ke Grand Total
+                // Jika dicentang (Sudah Termasuk harga unit): Booking Fee TIDAK ditambahkan karena sudah termasuk di harga dasar
+                const total = net + ppjb + shm + oth + (includeBookingFee ? 0 : bookingFee);
                 netPrice.value = formatNumber(net);
-                grandTotal.value = formatNumber(net);
+                grandTotal.value = formatNumber(total);
+
+                // Enable booking fee for all payment methods
+                if (bookingFeeInput) {
+                    bookingFeeInput.disabled = false;
+                }
 
                 // Handle Cash Keras - full payment, disable all installment fields
                 if (paymentMethod.value === 'cash') {
@@ -266,41 +286,41 @@
                     dpPercentInput.value = '';
                     dpPercentInput.disabled = true;
                     dpInput.value = '';
-                    // Disable Booking Fee
-                    if (bookingFeeInput) {
-                        bookingFeeInput.value = '';
-                        bookingFeeInput.disabled = true;
-                    }
 
                     // Hide asterisks for tenor/due day
                     document.querySelectorAll('#tenorField .req-mark, #dueDayField .req-mark').forEach(el => el.style.display = 'none');
-                    if (dpRupiahDisplay) dpRupiahDisplay.textContent = 'N/A (Cash Keras)';
-                    installmentEstimate.value = 'N/A (Cash Keras)';
+                    if (dpRupiahDisplay) dpRupiahDisplay.textContent = '100% (Cash Keras)';
+                    installmentEstimate.value = '100% (Cash Keras)';
                     return;
                 }
 
-                // Enable booking fee for non-cash if it exists
-                if (bookingFeeInput) {
-                    bookingFeeInput.disabled = false;
-                }
-
-                // Handle KPR Bank - allow DP optional, disable tenor/due day
+                // Handle KPR Bank - allow DP optional, tenor/due day are optional but enabled
                 if (paymentMethod.value === 'kpr') {
-                    tenorInput.value = '';
-                    tenorInput.disabled = true;
+                    // Keep tenor and due day enabled but optional
+                    tenorInput.disabled = false;
                     tenorInput.removeAttribute('required');
-                    dueDayInput.value = '';
-                    dueDayInput.disabled = true;
+                    dueDayInput.disabled = false;
                     dueDayInput.removeAttribute('required');
-                    // Hide asterisks for tenor/due day
+                    // Hide asterisks for tenor/due day (optional)
                     document.querySelectorAll('#tenorField .req-mark, #dueDayField .req-mark').forEach(el => el.style.display = 'none');
-                    installmentEstimate.value = 'N/A (KPR Bank)';
-                    // DP is optional for KPR
-                    dpPercentInput.disabled = false;
+
+                    // Calculate installment estimate if tenor is provided
+                    const tenor = Number(tenorInput.value || 0);
                     const dpPercentVal = Number(dpPercentInput.value || 0);
                     const dp = Math.max(0, Math.round(net * (dpPercentVal / 100)));
                     dpInput.value = dp;
                     if (dpRupiahDisplay) dpRupiahDisplay.textContent = formatIDR(dp);
+
+                    const outstanding = Math.max(0, net - dp);
+                    if (tenor > 0) {
+                        const monthly = Math.ceil(outstanding / tenor);
+                        installmentEstimate.value = formatIDR(monthly);
+                    } else {
+                        installmentEstimate.value = 'Masukkan tenor untuk estimasi';
+                    }
+
+                    // DP is optional for KPR
+                    dpPercentInput.disabled = false;
                     return;
                 }
 
@@ -329,56 +349,57 @@
 
             // Format currency inputs on type
             document.querySelectorAll('.currency-input').forEach(input => {
-                input.addEventListener('input', function(e) {
+                input.addEventListener('input', function (e) {
                     let cursorPosition = this.selectionStart;
                     let oldLength = this.value.length;
-                    
+
                     let val = this.value.replace(/\D/g, '');
-                    if(val !== '') {
+                    if (val !== '') {
                         this.value = Number(val).toLocaleString('id-ID');
                     } else {
                         this.value = '';
                     }
-                    
+
                     let newLength = this.value.length;
                     cursorPosition = cursorPosition + (newLength - oldLength);
                     this.setSelectionRange(cursorPosition, cursorPosition);
-                    
+
                     recalc();
                 });
             });
 
             // Strip dots on submit
-            document.getElementById('saleForm').addEventListener('submit', function(e) {
-                 document.querySelectorAll('.currency-input, .readonly').forEach(input => {
-                     input.value = input.value.replace(/\./g, '');
-                 });
-                 // Enable disabled fields so they are submitted (if key logic requires them) 
-                 // - usually disabled fields are not submitted. 
-                 // If backend expects them, we should use hidden inputs. 
-                 // But in this form, 'price', 'grandTotal' etc are mostly for display or calculated on backend?
-                 // Let's assume backend recalculates essential totals or validates them.
-                 // However, base_price IS essential.
-                 
-                 // Also ensure dpInput is set correctly if it was relying on calc
-                 // dpInput is hidden, so it's fine.
+            document.getElementById('saleForm').addEventListener('submit', function (e) {
+                document.querySelectorAll('.currency-input, .readonly').forEach(input => {
+                    input.value = input.value.replace(/\./g, '');
+                });
+                // Enable disabled fields so they are submitted (if key logic requires them) 
+                // - usually disabled fields are not submitted. 
+                // If backend expects them, we should use hidden inputs. 
+                // But in this form, 'price', 'grandTotal' etc are mostly for display or calculated on backend?
+                // Let's assume backend recalculates essential totals or validates them.
+                // However, base_price IS essential.
+
+                // Also ensure dpInput is set correctly if it was relying on calc
+                // dpInput is hidden, so it's fine.
             });
 
             [basePrice, discount, extraPpjb, extraShm, extraOther, dpPercentInput, dpInput, tenorInput, paymentMethod].forEach(el => el?.addEventListener('input', recalc));
+            bookingFeeIncluded?.addEventListener('change', recalc);
             // Remove previous event listeners on currency inputs to avoid double trigger if any?
             // Actually 'input' event bubbles/multi-binds fine. 
             // Note: recalc is called inside the currency-input listener above.
             // But we keep this for non-currency inputs like dpPercent.
-            
+
             dpPercentInput?.addEventListener('input', () => { window.lastDpChange = 'percent'; recalc(); });
             dpInput?.addEventListener('input', () => { window.lastDpChange = 'nominal'; recalc(); });
-            
+
             // Fix double event on keys that are currency inputs, but it doesn't hurt much.
             // We can remove currency inputs from the array below if we want optimization.
             const nonCurrencyInputs = [dpPercentInput, dpInput, tenorInput, paymentMethod];
-            nonCurrencyInputs.forEach(el => el?.addEventListener('input', () => { 
-                if (!['percent', 'nominal'].includes(window.lastDpChange)) window.lastDpChange = null; 
-                recalc(); 
+            nonCurrencyInputs.forEach(el => el?.addEventListener('input', () => {
+                if (!['percent', 'nominal'].includes(window.lastDpChange)) window.lastDpChange = null;
+                recalc();
             }));
 
             lotSelect?.addEventListener('change', () => {

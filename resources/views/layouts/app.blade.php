@@ -49,10 +49,10 @@
     <div class="app-shell">
         <aside class="sidebar">
             <div class="brand">
-                <div class="brand-mark logo" aria-label="SIMAK Logo" style="width:260px; height:auto;">
+                <div class="brand-mark logo" aria-label="SIMAK Logo" style="width: 100%; max-width: 16rem; height: auto;">
                     <img class="app-logo-img" src="{{ asset('/logo-app.png') }}" alt="SIMAK Logo"
                         onerror="this.onerror=null;this.src='{{ asset('/logo-simak.svg') }}';"
-                        style="width:260px; height:auto;">
+                        style="width: 100%; height: auto; object-fit: contain;">
                 </div>
                 <div class="brand-text">
                     <span class="brand-sub">Sistem Informasi Manajemen Kavling</span>
