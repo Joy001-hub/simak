@@ -190,10 +190,12 @@ class LicenseController extends Controller
          $licenseService->revokeLocalLicense();
          return redirect()->route('license.activate.form')
             ->with('success', 'Lisensi berhasil direset. Silakan aktivasi ulang.');
+      } else {
+         // Auto-delete license if reset returns valid: false
+         $licenseService->revokeLocalLicense();
+         return redirect()->route('license.activate.form')
+            ->withErrors(['msg' => 'Reset gagal, lisensi lokal dihapus. Silakan aktivasi ulang.']);
       }
-
-      return redirect()->route('license.activate.form')
-         ->withErrors(['msg' => 'Reset gagal. Kredensial tidak valid.']);
    }
 
    public function logout()
