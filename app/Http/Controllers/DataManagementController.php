@@ -9,6 +9,7 @@ use App\Models\Marketer;
 use App\Models\Payment;
 use App\Models\Project;
 use App\Models\Sale;
+use Database\Seeders\DataDummySeeders;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +34,8 @@ class DataManagementController extends Controller
         try {
             DB::transaction(function () {
                 $this->resetData();
-                $this->generateDemoData();
+                // Gunakan seeder dummy terbaru (2023-2025) agar konsisten dengan logika aplikasi
+                (new DataDummySeeders())->run();
                 $this->seedDefaultCompanyProfile();
             });
 
