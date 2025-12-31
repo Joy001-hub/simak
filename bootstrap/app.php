@@ -56,5 +56,92 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Handle all exceptions gracefully - never show 500 error page
+        $exceptions->render(function (\Throwable $e, \Illuminate\Http\Request $request) {
+            // Log the error for debugging
+            \Illuminate\Support\Facades\Log::error('[Exception] ' . get_class($e) . ': ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'url' => $request->fullUrl(),
+                'method' => $request->method(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // For AJAX/API requests, return JSON error
+            if ($request->expectsJson() || $request->is('api/*')) {
+                $statusCode = $e instanceof \Symfony\Component\HttpKernel\Exception\HttpException
+                    ? $e->getStatusCode()
+                    : 500;
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $e instanceof \Illuminate\Validation\ValidationException
+                        ? $e->getMessage()
+                        : 'Terjadi kesalahan sistem. Silakan coba lagi.',
+                    'error' => config('app.debug') ? $e->getMessage() : null,
+                ], $statusCode);
+            }
+
+            // Handle specific exception types
+            if ($e instanceof \Illuminate\Session\TokenMismatchException) {
+                return redirect()->back()
+                    ->withInput($request->except('password', 'password_confirmation'))
+                    ->withErrors(['msg' => 'Sesi Anda telah berakhir. Silakan coba lagi.']);
+            }
+
+            if ($e instanceof \Illuminate\Validation\ValidationException) {
+                return redirect()->back()
+                    ->withInput($request->except('password', 'password_confirmation'))
+                    ->withErrors($e->errors());
+            }
+
+            if ($e instanceof \Illuminate\Database\QueryException) {
+                return redirect()->back()
+                    ->withInput($request->except('password', 'password_confirmation'))
+                    ->withErrors(['msg' => 'Terjadi kesalahan database. Silakan coba lagi.']);
+            }
+
+            if (
+                $e instanceof \Illuminate\Http\Client\ConnectionException ||
+                $e instanceof \Illuminate\Http\Client\RequestException
+            ) {
+                return redirect()->back()
+                    ->withInput($request->except('password', 'password_confirmation'))
+                    ->withErrors(['msg' => 'Gagal terhubung ke server. Periksa koneksi internet Anda.']);
+            }
+
+            // Check if we can use the error view
+            try {
+                return response()->view('errors.general', [
+                    'message' => 'Terjadi kesalahan sistem.',
+                    'description' => config('app.debug') ? $e->getMessage() : 'Silakan coba lagi atau hubungi administrator.',
+                    'code' => $e instanceof \Symfony\Component\HttpKernel\Exception\HttpException ? $e->getStatusCode() : 500,
+                ], 500);
+            } catch (\Throwable $viewError) {
+                // Fallback: redirect to a safe page with error message
+                $redirectRoute = 'license.activate.form';
+                try {
+                    if (\Illuminate\Support\Facades\Route::has($redirectRoute)) {
+                        return redirect()->route($redirectRoute)
+                            ->withErrors(['msg' => 'Terjadi kesalahan sistem. Silakan coba lagi.']);
+                    }
+                } catch (\Throwable $redirectError) {
+                    // Ultimate fallback
+                }
+
+                // If all else fails, return simple HTML response
+                return response(
+                    '<!DOCTYPE html>
+                    <html><head><title>Error</title><meta charset="UTF-8">
+                    <style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f1f5f9;}
+                    .box{text-align:center;padding:40px;background:white;border-radius:16px;box-shadow:0 4px 6px rgba(0,0,0,0.1);}
+                    h1{color:#ef4444;margin-bottom:10px;}
+                    p{color:#64748b;}
+                    a{color:#b91c3b;text-decoration:none;font-weight:600;}
+                    </style></head>
+                    <body><div class="box"><h1>Oops!</h1><p>Terjadi kesalahan sistem.<br>Silakan <a href="javascript:location.reload()">muat ulang halaman</a> atau coba lagi nanti.</p></div></body></html>',
+                    500
+                );
+            }
+        });
     })->create();
