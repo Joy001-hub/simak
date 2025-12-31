@@ -771,16 +771,12 @@
                     },
                     plugins: {
                         legend: {
-                            display: true,
-                            labels: {
-                                color: '#1E293B',
-                                boxWidth: 14,
-                                boxHeight: 14,
-                                usePointStyle: true,
-                                filter: (item) => item.datasetIndex === 0 // Only show first dataset (Nilai Rp)
-                            }
+                            display: false
                         },
                         tooltip: {
+                            filter: function (tooltipItem) {
+                                return tooltipItem.parsed.y > 0 && tooltipItem.dataset.label !== '';
+                            },
                             callbacks: {
                                 label: ctx => `${ctx.dataset.label}: ${salesMode === 'unit' ? unitTick(ctx.parsed.y) : formatRupiahFull(ctx.parsed.y)}`
                             }

@@ -186,9 +186,17 @@
                                 $icon = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block; vertical-align:middle;"><circle cx="12" cy="12" r="10" fill="#ef4444"/><path d="M12 7V13" stroke="white" stroke-width="2.5" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1.5" fill="white"/></svg>';
                             if ($statusTagihan === 'Jatuh Tempo < 7 Hari')
                                 $icon = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block; vertical-align:middle;"><circle cx="12" cy="12" r="10" fill="#f59e0b"/><path d="M12 7V12L15 15" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-                            $dpStatus = $item['status_dp'] ?? 'Belum';
-                            $dpColor = $dpStatus === 'Lunas' ? '#16a34a' : '#6b7280';
-                            $dpBg = $dpStatus === 'Lunas' ? 'rgba(22,163,74,0.12)' : 'rgba(107,114,128,0.12)';
+                            $dpStatus = $item['status_dp'] ?? 'N/A';
+                            if ($dpStatus === 'Lunas') {
+                                $dpColor = '#16a34a';
+                                $dpBg = 'rgba(22,163,74,0.12)';
+                            } elseif ($dpStatus === 'Belum') {
+                                $dpColor = '#ca8a04';
+                                $dpBg = 'rgba(234,179,8,0.15)';
+                            } else {
+                                $dpColor = '#6b7280';
+                                $dpBg = 'rgba(107,114,128,0.12)';
+                            }
                             $saleStatus = $item['status'] ?? '';
                             $statusBg = $saleStatus === 'Paid Off' ? 'rgba(16,185,129,0.15)' : ($saleStatus === 'Active' ? 'rgba(59,130,246,0.15)' : 'rgba(107,114,128,0.15)');
                             $statusColor = $saleStatus === 'Paid Off' ? '#0f9d58' : ($saleStatus === 'Active' ? '#2563eb' : '#6b7280');
@@ -266,9 +274,16 @@
                     let icon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block; vertical-align:middle;"><circle cx="12" cy="12" r="10" fill="#22c55e"/><path d="M7.5 12L10.5 15L16.5 9" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
                     if (statusTagihan === 'Ada Tunggakan') icon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block; vertical-align:middle;"><circle cx="12" cy="12" r="10" fill="#ef4444"/><path d="M12 7V13" stroke="white" stroke-width="2.5" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1.5" fill="white"/></svg>`;
                     if (statusTagihan === 'Jatuh Tempo < 7 Hari') icon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block; vertical-align:middle;"><circle cx="12" cy="12" r="10" fill="#f59e0b"/><path d="M12 7V12L15 15" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-                    const dpStatus = item.status_dp || 'Belum';
-                    const dpBg = dpStatus === 'Lunas' ? 'rgba(22,163,74,0.12)' : 'rgba(107,114,128,0.12)';
-                    const dpColor = dpStatus === 'Lunas' ? '#16a34a' : '#6b7280';
+                    const dpStatus = item.status_dp || 'N/A';
+                    let dpBg = 'rgba(107,114,128,0.12)';
+                    let dpColor = '#6b7280';
+                    if (dpStatus === 'Lunas') {
+                        dpBg = 'rgba(22,163,74,0.12)';
+                        dpColor = '#16a34a';
+                    } else if (dpStatus === 'Belum') {
+                        dpBg = 'rgba(234,179,8,0.15)';
+                        dpColor = '#ca8a04';
+                    }
                     const saleStatus = item.status || '';
                     let statusBg = 'rgba(107,114,128,0.15)';
                     let statusColor = '#6b7280';
@@ -287,21 +302,21 @@
                         statusColor = '#b45309';
                     }
                     return `<tr>
-                                                                        <td style="text-align:center; white-space:nowrap;" title="${statusTagihan}">${icon}</td>
-                                                                        <td style="font-weight:700; color:#0f172a; white-space:nowrap;">${item.kavling ?? '-'}</td>
-                                                                        <td style="white-space:nowrap;">${item.pembeli ?? '-'}</td>
-                                                                        <td style="white-space:nowrap;">${item.tgl_booking ?? '-'}</td>
-                                                                        <td style="white-space:nowrap;">${item.metode_bayar ?? '-'}</td>
-                                                                        <td style="white-space:nowrap;">Rp ${harga}</td>
-                                                                        <td style="color:${outstandingRed}; font-weight:700; white-space:nowrap;">Rp ${sisa}</td>
-                                                                        <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${dpBg}; color:${dpColor}; font-weight:700; white-space:nowrap;">${dpStatus}</span></td>
-                                                                        <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${statusBg}; color:${statusColor}; font-weight:700; white-space:nowrap;">${saleStatus === 'Paid Off' ? '🤝 ' : ''}${saleStatus || '-'}</span></td>
-                                                                        <td style="white-space:nowrap;">${item.estimasi_lunas ?? '-'}</td>
-                                                                        <td style="white-space:nowrap;">${item.marketing ?? '-'}</td>
-                                                                        <td style="padding-left:14px; white-space: nowrap;">
-                                                                            <a href="/penjualan/${item.id}" class="btn light" style="padding:8px 10px; border-color:#e5e7eb;">Detail</a>
-                                                                        </td>
-                                                                    </tr>`;
+                                                                                <td style="text-align:center; white-space:nowrap;" title="${statusTagihan}">${icon}</td>
+                                                                                <td style="font-weight:700; color:#0f172a; white-space:nowrap;">${item.kavling ?? '-'}</td>
+                                                                                <td style="white-space:nowrap;">${item.pembeli ?? '-'}</td>
+                                                                                <td style="white-space:nowrap;">${item.tgl_booking ?? '-'}</td>
+                                                                                <td style="white-space:nowrap;">${item.metode_bayar ?? '-'}</td>
+                                                                                <td style="white-space:nowrap;">Rp ${harga}</td>
+                                                                                <td style="color:${outstandingRed}; font-weight:700; white-space:nowrap;">Rp ${sisa}</td>
+                                                                                <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${dpBg}; color:${dpColor}; font-weight:700; white-space:nowrap;">${dpStatus}</span></td>
+                                                                                <td><span style="display:inline-block; padding:4px 10px; border-radius:999px; background:${statusBg}; color:${statusColor}; font-weight:700; white-space:nowrap;">${saleStatus === 'Paid Off' ? '🤝 ' : ''}${saleStatus || '-'}</span></td>
+                                                                                <td style="white-space:nowrap;">${item.estimasi_lunas ?? '-'}</td>
+                                                                                <td style="white-space:nowrap;">${item.marketing ?? '-'}</td>
+                                                                                <td style="padding-left:14px; white-space: nowrap;">
+                                                                                    <a href="/penjualan/${item.id}" class="btn light" style="padding:8px 10px; border-color:#e5e7eb;">Detail</a>
+                                                                                </td>
+                                                                            </tr>`;
                 }).join('');
             };
 

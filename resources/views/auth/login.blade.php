@@ -382,6 +382,11 @@
     </a>
 
     <script>
+        // Track page load time to detect stale sessions
+        const pageLoadTime = Date.now();
+        const SESSION_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
+        let isSubmitting = false;
+
         function togglePassword(inputId, btn) {
             const input = document.getElementById(inputId);
             if (input.type === 'password') {
@@ -398,14 +403,112 @@
             }
         }
 
-        document.getElementById('login-form').addEventListener('submit', function (e) {
+        // Reset button state
+        function resetButtonState() {
             const btn = document.getElementById('submit-btn');
             const btnText = document.getElementById('btn-text');
             const btnSpinner = document.getElementById('btn-spinner');
 
+            btn.disabled = false;
+            btnText.textContent = 'Login';
+            btnSpinner.classList.add('hidden');
+            isSubmitting = false;
+        }
+
+        // Show inline error message
+        function showError(message) {
+            let existingAlert = document.querySelector('.js-error-alert');
+            if (existingAlert) {
+                existingAlert.querySelector('span').textContent = message;
+                return;
+            }
+
+            const alertHtml = `
+                <div class="js-error-alert mx-6 mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm fade-in" role="alert">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                        <span>${message}</span>
+                    </div>
+                </div>
+            `;
+
+            const form = document.getElementById('login-form');
+            form.insertAdjacentHTML('beforebegin', alertHtml);
+        }
+
+        // Check if session might be stale
+        function isSessionStale() {
+            return (Date.now() - pageLoadTime) > SESSION_TIMEOUT_MS;
+        }
+
+        // Refresh CSRF token
+        async function refreshCsrfToken() {
+            try {
+                const response = await fetch(window.location.href, {
+                    method: 'GET',
+                    credentials: 'same-origin'
+                });
+
+                if (response.ok) {
+                    const html = await response.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const newToken = doc.querySelector('input[name="_token"]')?.value;
+
+                    if (newToken) {
+                        document.querySelector('input[name="_token"]').value = newToken;
+                        return true;
+                    }
+                }
+            } catch (e) {
+                console.warn('[CSRF] Failed to refresh:', e);
+            }
+            return false;
+        }
+
+        document.getElementById('login-form').addEventListener('submit', async function (e) {
+            if (isSubmitting) {
+                e.preventDefault();
+                return;
+            }
+
+            const btn = document.getElementById('submit-btn');
+            const btnText = document.getElementById('btn-text');
+            const btnSpinner = document.getElementById('btn-spinner');
+
+            // Refresh CSRF if session is stale
+            if (isSessionStale()) {
+                e.preventDefault();
+                btn.disabled = true;
+                btnText.textContent = 'Memperbarui sesi...';
+                btnSpinner.classList.remove('hidden');
+
+                const refreshed = await refreshCsrfToken();
+                if (refreshed) {
+                    isSubmitting = true;
+                    btnText.textContent = 'Memproses...';
+                    this.submit();
+                } else {
+                    showError('Sesi berakhir, halaman akan dimuat ulang...');
+                    setTimeout(() => location.reload(), 1500);
+                }
+                return;
+            }
+
+            isSubmitting = true;
             btn.disabled = true;
             btnText.textContent = 'Memproses...';
             btnSpinner.classList.remove('hidden');
+
+            // Timeout handler
+            setTimeout(() => {
+                if (isSubmitting) {
+                    showError('Permintaan timeout. Silakan coba lagi.');
+                    resetButtonState();
+                }
+            }, 45000);
         });
 
         // Auto-focus first field
@@ -422,6 +525,13 @@
                     setTimeout(() => alert.remove(), 300);
                 }, 5000);
             });
+        });
+
+        // Reset form state when navigating back
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                resetButtonState();
+            }
         });
     </script>
 </body>

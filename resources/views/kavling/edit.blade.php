@@ -11,7 +11,7 @@
         @csrf
         @method('PUT')
         <div class="field">
-            <label class="hint">Project</label>
+            <label class="hint">Project <span style="color:red">*</span></label>
             <select class="input" name="project_id" required>
                 @foreach($projects as $project)
                     <option value="{{ $project->id }}" @if($lot->project_id == $project->id) selected @endif>{{ $project->name }}
@@ -20,19 +20,19 @@
             </select>
         </div>
         <div class="field">
-            <label class="hint">Blok/Number</label>
+            <label class="hint">Blok/Number <span style="color:red">*</span></label>
             <input class="input" type="text" name="block_number" value="{{ $lot->block_number }}" required>
         </div>
         <div class="field">
-            <label class="hint">Luas (m²)</label>
-            <input class="input" type="number" name="area" min="0" value="{{ $lot->area }}">
+            <label class="hint">Luas (m²) <span style="color:red">*</span></label>
+            <input class="input" type="number" name="area" min="0" value="{{ $lot->area }}" required>
         </div>
         <div class="field">
-            <label class="hint">Harga Dasar (Rp)</label>
-            <input class="input" type="number" name="base_price" min="0" value="{{ $lot->base_price }}">
+            <label class="hint">Harga Dasar (Rp) <span style="color:red">*</span></label>
+            <input class="input" type="number" name="base_price" min="0" value="{{ $lot->base_price }}" required>
         </div>
         <div class="field">
-            <label class="hint">Status</label>
+            <label class="hint">Status <span style="color:red">*</span></label>
             <select class="input" name="status" required>
                 <option value="available" @if($lot->status == 'available') selected @endif>Available</option>
                 <option value="sold" @if($lot->status == 'sold') selected @endif>Sold</option>

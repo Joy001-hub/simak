@@ -11,6 +11,7 @@ use App\Models\Sale;
 use App\Models\Payment;
 use App\Models\CompanyProfile;
 use Illuminate\Support\Facades\Storage;
+use Database\Seeders\DataDummySeeders;
 
 class DatabaseSeeder extends Seeder
 {
@@ -30,8 +31,8 @@ class DatabaseSeeder extends Seeder
             'logo_path' => null,
         ]);
 
-        // Seed demo data lengkap
-        $this->call(DummyDataSeeder::class);
+        // Seed demo data lengkap (2023-2025) menggunakan seeder terbaru
+        $this->call(DataDummySeeders::class);
 
         // Optional: seed a placeholder logo if exists
         if (Storage::disk('public')->exists('logos/company-logo.png') === false) {

@@ -11,7 +11,7 @@
         @csrf
         @method('PUT')
         <div class="field">
-            <label class="hint">Nama</label>
+            <label class="hint">Nama <span style="color:red">*</span></label>
             <input class="input" type="text" name="name" value="{{ $marketer->name }}" required>
         </div>
         <div class="field">

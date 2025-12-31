@@ -13,12 +13,12 @@
             <input type="hidden" name="from_sale" value="{{ $fromSale }}">
         @endif
         <div class="field">
-            <label class="hint">Nama</label>
+            <label class="hint">Nama <span style="color:red">*</span></label>
             <input class="input" type="text" name="name" required>
         </div>
         <div class="field">
-            <label class="hint">Telepon</label>
-            <input class="input" type="text" name="phone">
+            <label class="hint">Telepon <span style="color:red">*</span></label>
+            <input class="input" type="text" name="phone" required>
         </div>
         <div class="field">
             <label class="hint">Email</label>

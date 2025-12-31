@@ -11,12 +11,12 @@
         @csrf
         @method('PUT')
         <div class="field">
-            <label class="hint">Nama Project</label>
+            <label class="hint">Nama Project <span style="color:red">*</span></label>
             <input class="input" type="text" name="name" value="{{ old('name', $project->name) }}" required>
         </div>
         <div class="field">
-            <label class="hint">Lokasi</label>
-            <input class="input" type="text" name="location" value="{{ old('location', $project->location) }}">
+            <label class="hint">Lokasi <span style="color:red">*</span></label>
+            <input class="input" type="text" name="location" value="{{ old('location', $project->location) }}" required>
         </div>
         <div class="field">
             <label class="hint">Catatan</label>
@@ -25,7 +25,7 @@
         <div class="field">
             <label class="hint">Total Unit</label>
             <input class="input" type="number" name="total_units" min="0"
-                value="{{ old('total_units', $project->total_units) }}">
+                value="{{ old('total_units', $project->total_units) }}" placeholder="0">
         </div>
         <div style="display:flex; gap:10px; justify-content:flex-end;">
             <a class="btn light" href="{{ route('projects.index') }}">Batal</a>
