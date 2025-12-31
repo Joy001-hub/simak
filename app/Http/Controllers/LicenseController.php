@@ -70,7 +70,7 @@ class LicenseController extends Controller
             $isValid = $licenseService->isRemoteValid($result, $licenseKey, 'activate');
 
             if ($isValid) {
-                $licenseService->saveLocalLicense([
+                $saved = $licenseService->saveLocalLicense([
                     'license_key' => $licenseKey,
                     'status' => 'active',
                     'hardware_id' => $licenseService->getHardwareId(),
@@ -78,6 +78,17 @@ class LicenseController extends Controller
                     'last_check_at' => now()->toIso8601String(),
                     'message' => 'Registered via activation',
                 ]);
+
+                if (!$saved) {
+                    $errorMsg = $licenseService->getLastError() ?? 'Gagal menyimpan lisensi ke perangkat.';
+                    Log::error('[License] Failed to save license locally', [
+                        'error' => $errorMsg,
+                        'email' => $email,
+                    ]);
+                    return redirect()->route('license.activate.form')
+                        ->withErrors(['msg' => 'Aktivasi berhasil, tapi ' . $errorMsg . ' Coba jalankan aplikasi sebagai Administrator.'])
+                        ->withInput();
+                }
 
                 session(['license_authenticated' => true]);
                 session(['license_user_email' => $email]);
